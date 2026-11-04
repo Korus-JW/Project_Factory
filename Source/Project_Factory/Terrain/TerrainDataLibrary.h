@@ -35,5 +35,10 @@ public:
 	static FVector GetCellLocalCenter(int32 X, int32 Y);
 
 	UFUNCTION(BlueprintPure, Category = "Factory|Terrain")
+	static FVector GetCellLocalOrigin(int32 X, int32 Y);
+
+	UFUNCTION(BlueprintPure, Category = "Factory|Terrain")
 	static float GetCellSize() { return CellSize; }
+
+
 };

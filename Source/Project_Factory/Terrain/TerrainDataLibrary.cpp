@@ -67,3 +67,9 @@ FVector UTerrainDataLibrary::GetCellLocalCenter(int32 X, int32 Y)
 	return FVector((static_cast<double>(X) + 0.5) * CellSize,
 		(static_cast<double>(Y) + 0.5) * CellSize, 0.0);
 }
+
+FVector UTerrainDataLibrary::GetCellLocalOrigin(int32 X, int32 Y)
+{
+	return FVector(static_cast<double>(X) * CellSize,
+		static_cast<double>(Y) * CellSize, 0.0);
+}
