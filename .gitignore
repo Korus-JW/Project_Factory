@@ -73,3 +73,13 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# Purchased assets excluded from the public repository
+/Content/Resource/
+
+# Local assistant scratch files and generated previews
+.tmp/
+.tmp-*/
+.tmp-*
+__pycache__/
+*.pyc
