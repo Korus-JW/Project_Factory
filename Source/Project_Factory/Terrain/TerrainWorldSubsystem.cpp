@@ -3,6 +3,7 @@
 #include "TerrainDataLibrary.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "../Buildings/FactoryBuildingBase.h"
 
 namespace
 {
@@ -112,8 +113,84 @@ bool UTerrainWorldSubsystem::GetChunkWorldOrigin(FIntPoint ChunkCoordinate, FVec
 
 void UTerrainWorldSubsystem::ClearMap()
 {
+	OccupiedCells.Empty();
+	RegisteredBuildingCells.Empty();
 	Chunks.Empty();
 	ChunkDimensions = FIntPoint::ZeroValue;
+}
+
+AFactoryBuildingBase* UTerrainWorldSubsystem::GetBuildingAtCell(FIntPoint GridCoordinate) const
+{
+	const TWeakObjectPtr<AFactoryBuildingBase>* Building = OccupiedCells.Find(GridCoordinate);
+	return Building ? Building->Get() : nullptr;
+}
+
+bool UTerrainWorldSubsystem::IsAreaFree(const TArray<FIntPoint>& GridCoordinates) const
+{
+	if (GridCoordinates.IsEmpty())
+	{
+		return false;
+	}
+	for (const FIntPoint& Coordinate : GridCoordinates)
+	{
+		if (GetBuildingAtCell(Coordinate))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool UTerrainWorldSubsystem::CanPlaceBuilding(AFactoryBuildingBase* Building,
+	FIntPoint AnchorGridCoordinate, int32 QuarterTurns) const
+{
+	return IsValid(Building) && Building->GetWorld() == GetWorld()
+		&& Building->CanPlaceOnTerrain(AnchorGridCoordinate, QuarterTurns)
+		&& IsAreaFree(Building->GetFootprintCells(AnchorGridCoordinate, QuarterTurns));
+}
+
+bool UTerrainWorldSubsystem::TryRegisterBuilding(AFactoryBuildingBase* Building,
+	FIntPoint AnchorGridCoordinate, int32 QuarterTurns)
+{
+	if (!IsValid(Building) || Building->IsPlacementPreview()
+		|| RegisteredBuildingCells.Contains(TWeakObjectPtr<AFactoryBuildingBase>(Building))
+		|| !CanPlaceBuilding(Building, AnchorGridCoordinate, QuarterTurns))
+	{
+		return false;
+	}
+
+	// 검사가 끝난 뒤에만 모든 셀을 기록하므로 실패 시 부분 점유가 남지 않는다.
+	TArray<FIntPoint> Cells = Building->GetFootprintCells(AnchorGridCoordinate, QuarterTurns);
+	for (const FIntPoint& Coordinate : Cells)
+	{
+		OccupiedCells.Add(Coordinate, Building);
+	}
+	RegisteredBuildingCells.Add(Building, MoveTemp(Cells));
+	return true;
+}
+
+bool UTerrainWorldSubsystem::UnregisterBuilding(AFactoryBuildingBase* Building)
+{
+	if (!Building)
+	{
+		return false;
+	}
+	const TWeakObjectPtr<AFactoryBuildingBase> Key(Building);
+	const TArray<FIntPoint>* Cells = RegisteredBuildingCells.Find(Key);
+	if (!Cells)
+	{
+		return false;
+	}
+	for (const FIntPoint& Coordinate : *Cells)
+	{
+		const TWeakObjectPtr<AFactoryBuildingBase>* Occupant = OccupiedCells.Find(Coordinate);
+		if (Occupant && *Occupant == Key)
+		{
+			OccupiedCells.Remove(Coordinate);
+		}
+	}
+	RegisteredBuildingCells.Remove(Key);
+	return true;
 }
 
 void UTerrainWorldSubsystem::Deinitialize()

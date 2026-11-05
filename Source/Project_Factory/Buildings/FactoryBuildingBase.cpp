@@ -4,6 +4,25 @@
 #include "Components/StaticMeshComponent.h"
 #include "../Terrain/TerrainWorldSubsystem.h"
 
+void AFactoryBuildingBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UTerrainWorldSubsystem* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this))
+	{
+		Terrain->UnregisterBuilding(this);
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void AFactoryBuildingBase::Destroyed()
+{
+	// 에디터에서 제거되는 경우에도 점유를 정리한다. 중복 해제 호출은 안전하다.
+	if (UTerrainWorldSubsystem* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this))
+	{
+		Terrain->UnregisterBuilding(this);
+	}
+	Super::Destroyed();
+}
+
 AFactoryBuildingBase::AFactoryBuildingBase()
 {
 	PrimaryActorTick.bCanEverTick = false;

@@ -74,6 +74,9 @@ public:
 	bool bCanBuild = false;
 
 protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void Destroyed() override;
+
 	/** 자식 블루프린트에서 미리보기 재질 적용과 원래 재질 복원을 구현한다. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Factory|Building|Preview")
 	void OnPlacementPreviewChanged(bool bPreview);
