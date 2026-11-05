@@ -76,6 +76,7 @@ DerivedDataCache/*
 
 # Purchased assets excluded from the public repository
 /Content/Resource/
+/Art/
 
 # Local assistant scratch files and generated previews
 .tmp/
