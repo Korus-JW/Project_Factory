@@ -1,9 +1,9 @@
-#include "TerrainWorldSubsystem.h"
+#include "Terrain/TerrainWorldSubsystem.h"
 
-#include "TerrainDataLibrary.h"
+#include "Terrain/TerrainDataLibrary.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
-#include "../Buildings/FactoryBuildingBase.h"
+#include "Buildings/FactoryBuildingBase.h"
 
 namespace
 {

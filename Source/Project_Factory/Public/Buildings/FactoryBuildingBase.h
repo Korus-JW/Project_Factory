@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "../Terrain/TerrainChunkData.h"
+#include "Terrain/TerrainChunkData.h"
 #include "FactoryBuildingBase.generated.h"
 
 class USceneComponent;
@@ -50,8 +50,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Factory|Building|Preview")
 	bool IsPlacementPreview() const { return bPlacementPreview; }
 
+	UFUNCTION(BlueprintCallable, Category = "Factory|Building")
+	void RotateBuilding();
+
+	/** 실제 배치 액터에 미리보기의 회전 단계를 전달할 때도 사용한다. */
+	UFUNCTION(BlueprintCallable, Category = "Factory|Building")
+	void SetRotationStep(int32 NewRotationStep);
+
+	/** 메시의 수평 중심과 회전 후 점유 영역을 맞춘다. 메시 교체 후에도 호출할 수 있다. */
+	UFUNCTION(BlueprintCallable, Category = "Factory|Building")
+	void RefreshBuildingTransform();
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Factory|Building|Components")
 	TObjectPtr<USceneComponent> BuildingRoot;
+
+	/** 점유 영역의 중심에 위치하며 건물의 수평 회전을 담당한다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Factory|Building|Components")
+	TObjectPtr<USceneComponent> RotationRoot;
+
+	/** 자동 중심 정렬 후 추가할 수평 보정값이다. 메시 높이는 기존 상대 Z를 유지한다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Factory|Building")
+	FVector2D MeshCenterOffset = FVector2D::ZeroVector;
 
 	/** 자식 블루프린트에서 메시와 상대 위치를 설정한다. 루트는 격자 기준점으로 유지한다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Factory|Building|Components")
@@ -73,7 +92,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Factory|Building")
 	bool bCanBuild = false;
 
+	/*건물의 회전 횟수 (0~3)*/
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Factory|Building")
+	int32 RotationStep = 0;
+
 protected:
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Destroyed() override;
 

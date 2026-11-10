@@ -1,8 +1,10 @@
-#include "FactoryBuildingBase.h"
+#include "Buildings/FactoryBuildingBase.h"
 
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "../Terrain/TerrainWorldSubsystem.h"
+#include "Terrain/TerrainWorldSubsystem.h"
+#include "Terrain/TerrainDataLibrary.h"
+#include "Engine/StaticMesh.h"
 
 void AFactoryBuildingBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
@@ -30,8 +32,11 @@ AFactoryBuildingBase::AFactoryBuildingBase()
 	BuildingRoot = CreateDefaultSubobject<USceneComponent>(TEXT("BuildingRoot"));
 	SetRootComponent(BuildingRoot);
 
+	RotationRoot = CreateDefaultSubobject<USceneComponent>(TEXT("RotationRoot"));
+	RotationRoot->SetupAttachment(BuildingRoot);
+
 	BuildingMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BuildingMesh"));
-	BuildingMesh->SetupAttachment(BuildingRoot);
+	BuildingMesh->SetupAttachment(RotationRoot);
 	BuildingMesh->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	BuildingMesh->SetGenerateOverlapEvents(false);
 
@@ -123,5 +128,47 @@ void AFactoryBuildingBase::SetPlacementPreview(bool bPreview)
 
 	bPlacementPreview = bPreview;
 	OnPlacementPreviewChanged(bPreview);
+}
+
+void AFactoryBuildingBase::RotateBuilding()
+{
+	SetRotationStep((RotationStep % 4 + 1) % 4);
+}
+
+void AFactoryBuildingBase::SetRotationStep(int32 NewRotationStep)
+{
+	RotationStep = ((NewRotationStep % 4) + 4) % 4;
+	RefreshBuildingTransform();
+}
+
+void AFactoryBuildingBase::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	RefreshBuildingTransform();
+}
+
+void AFactoryBuildingBase::RefreshBuildingTransform()
+{
+	RotationStep = ((RotationStep % 4) + 4) % 4;
+	const FIntPoint Size = GetRotatedFootprintSize(RotationStep);
+	const double HalfCell = UTerrainDataLibrary::CellSize * 0.5;
+	RotationRoot->SetRelativeLocation(FVector(Size.X * HalfCell, Size.Y * HalfCell, 0.0));
+	RotationRoot->SetRelativeRotation(FRotator(0.0, RotationStep * 90.0, 0.0));
+
+	// 기존 블루프린트에 저장된 이전 부모 연결도 새 회전 중심으로 연결한다.
+	if (BuildingMesh->GetAttachParent() != RotationRoot)
+	{
+		BuildingMesh->AttachToComponent(RotationRoot, FAttachmentTransformRules::KeepRelativeTransform);
+	}
+	if (const UStaticMesh* Mesh = BuildingMesh->GetStaticMesh())
+	{
+		// 피벗 방향에 관계없이 메시 경계의 중심을 맞추며 원래 회전과 스케일은 보존한다.
+		const FVector Center = BuildingMesh->GetRelativeRotation().RotateVector(
+			Mesh->GetBoundingBox().GetCenter() * BuildingMesh->GetRelativeScale3D());
+		FVector Location = BuildingMesh->GetRelativeLocation();
+		Location.X = -Center.X + MeshCenterOffset.X;
+		Location.Y = -Center.Y + MeshCenterOffset.Y;
+		BuildingMesh->SetRelativeLocation(Location);
+	}
 }
 
