@@ -1,4 +1,5 @@
 #include "Terrain/TerrainWorldSubsystem.h"
+#include "Roads/RoadNetworkActor.h"
 
 #include "Terrain/TerrainDataLibrary.h"
 #include "Engine/Engine.h"
@@ -113,6 +114,14 @@ bool UTerrainWorldSubsystem::GetChunkWorldOrigin(FIntPoint ChunkCoordinate, FVec
 
 void UTerrainWorldSubsystem::ClearMap()
 {
+	// 도로 표시와 데이터를 먼저 지워 점유 초기화 이후에도 길이 남는 것을 방지한다.
+	TSet<TWeakObjectPtr<ARoadNetworkActor>> Owners;
+	for (const auto& Pair : RoadOwners) Owners.Add(Pair.Value);
+	for (const auto& Owner : Owners)
+	{
+		if (Owner.IsValid()) Owner->ClearRoads();
+	}
+	RoadOwners.Empty();
 	OccupiedCells.Empty();
 	RegisteredBuildingCells.Empty();
 	Chunks.Empty();
@@ -133,7 +142,7 @@ bool UTerrainWorldSubsystem::IsAreaFree(const TArray<FIntPoint>& GridCoordinates
 	}
 	for (const FIntPoint& Coordinate : GridCoordinates)
 	{
-		if (GetBuildingAtCell(Coordinate))
+		if (GetBuildingAtCell(Coordinate) || GetRoadNetworkAtCell(Coordinate))
 		{
 			return false;
 		}
@@ -197,4 +206,31 @@ void UTerrainWorldSubsystem::Deinitialize()
 {
 	ClearMap();
 	Super::Deinitialize();
+}
+
+ARoadNetworkActor* UTerrainWorldSubsystem::GetRoadNetworkAtCell(FIntPoint GridCoordinate) const
+{
+ const auto* Entry = RoadOwners.Find(GridCoordinate);
+ ARoadNetworkActor* Owner = Entry ? Entry->Get() : nullptr;
+ return Owner && Owner->HasRoad(GridCoordinate) ? Owner : nullptr;
+}
+
+bool UTerrainWorldSubsystem::CanPlaceRoad(FIntPoint GridCoordinate) const
+{
+ FGridCellData Cell;
+ return GetCellAtGridCoordinate(GridCoordinate, Cell) && Cell.TerrainType == ETerrainType::Land
+  && !GetBuildingAtCell(GridCoordinate) && !GetRoadNetworkAtCell(GridCoordinate);
+}
+
+bool UTerrainWorldSubsystem::TryOccupyRoadCell(FIntPoint Cell, ARoadNetworkActor* Owner)
+{
+ if (!IsValid(Owner) || Owner->GetWorld() != GetWorld() || !CanPlaceRoad(Cell)) return false;
+ RoadOwners.Add(Cell, Owner);
+ return true;
+}
+
+void UTerrainWorldSubsystem::ReleaseRoadCell(FIntPoint Cell, ARoadNetworkActor* Owner)
+{
+ const auto* Entry = RoadOwners.Find(Cell);
+ if (Entry && *Entry == TWeakObjectPtr<ARoadNetworkActor>(Owner)) RoadOwners.Remove(Cell);
 }

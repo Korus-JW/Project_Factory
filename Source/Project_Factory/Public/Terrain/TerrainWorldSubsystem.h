@@ -6,6 +6,7 @@
 #include "TerrainWorldSubsystem.generated.h"
 
 class AFactoryBuildingBase;
+class ARoadNetworkActor;
 
 /** 현재 월드의 청크 원본을 보관한다. 좌표는 월드 원점에서 +X, +Y 방향으로 증가한다. */
 UCLASS(BlueprintType)
@@ -14,6 +15,13 @@ class PROJECT_FACTORY_API UTerrainWorldSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
+	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Road")
+	ARoadNetworkActor* GetRoadNetworkAtCell(FIntPoint GridCoordinate) const;
+
+	/** 생성된 땅이며 건물과 도로 모두 없는지 검사한다. */
+	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Road")
+	bool CanPlaceRoad(FIntPoint GridCoordinate) const;
+
 	/** 전체 격자 좌표의 점유 건물을 반환한다. 비어 있으면 nullptr이다. */
 	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Building")
 	AFactoryBuildingBase* GetBuildingAtCell(FIntPoint GridCoordinate) const;
@@ -87,6 +95,10 @@ public:
 	virtual void Deinitialize() override;
 
 private:
+	friend class ARoadNetworkActor;
+	bool TryOccupyRoadCell(FIntPoint Cell, ARoadNetworkActor* Owner);
+	void ReleaseRoadCell(FIntPoint Cell, ARoadNetworkActor* Owner);
+	TMap<FIntPoint, TWeakObjectPtr<ARoadNetworkActor>> RoadOwners;
 	// 약한 참조로 건물 수명을 연장하지 않는다. 조회는 전체 건물을 순회하지 않는다.
 	TMap<FIntPoint, TWeakObjectPtr<AFactoryBuildingBase>> OccupiedCells;
 

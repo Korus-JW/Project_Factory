@@ -96,6 +96,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Factory|Building")
 	int32 RotationStep = 0;
 
+	/*건설 비용*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Factory|Building")
+	int32 BuildCost = 0;
+
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
