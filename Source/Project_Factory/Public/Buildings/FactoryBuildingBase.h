@@ -8,6 +8,25 @@
 class USceneComponent;
 class UStaticMeshComponent;
 
+UENUM(BlueprintType)
+enum class EBuildingPortDirection : uint8
+{
+	North UMETA(DisplayName = "North (+Y)"),
+	East UMETA(DisplayName = "East (+X)"),
+	South UMETA(DisplayName = "South (-Y)"),
+	West UMETA(DisplayName = "West (-X)")
+};
+
+/** 회전 전 점유 영역 내부의 셀과 건물 바깥을 향하는 방향이다. */
+USTRUCT(BlueprintType)
+struct FBuildingRoadPort
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnabled = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FIntPoint LocalCell = FIntPoint::ZeroValue;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) EBuildingPortDirection OutwardDirection = EBuildingPortDirection::South;
+};
+
 /** 건물의 외형과 공통 정보를 제공한다. 생성 위치와 셀 점유는 배치 시스템에서 관리한다. */
 UCLASS(Blueprintable)
 class PROJECT_FACTORY_API AFactoryBuildingBase : public AActor
@@ -16,6 +35,16 @@ class PROJECT_FACTORY_API AFactoryBuildingBase : public AActor
 
 public:
 	AFactoryBuildingBase();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Factory|Building|Road")
+	FBuildingRoadPort EntrancePort;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Factory|Building|Road")
+	FBuildingRoadPort ExitPort;
+
+	/** 입구 또는 출구 앞 도로 셀과 도로에서 건물을 향하는 비트를 계산한다. 잘못된 경계 설정은 실패한다. */
+	UFUNCTION(BlueprintPure, Category = "Factory|Building|Road")
+	bool GetRoadPort(bool bEntrance, FIntPoint AnchorGridCoordinate, int32 QuarterTurns,
+		FIntPoint& OutRoadCell, int32& OutConnectionMask) const;
 
 	/** 각 축을 1~1024로 보정한 기본 점유 크기다. 한 셀은 500cm다. */
 	UFUNCTION(BlueprintPure, Category = "Factory|Building")

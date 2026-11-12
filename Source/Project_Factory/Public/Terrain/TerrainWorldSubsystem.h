@@ -15,6 +15,13 @@ class PROJECT_FACTORY_API UTerrainWorldSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
+	/** 해당 도로 셀에서 등록된 건물 입구·출구를 향하는 연결 비트다. */
+	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Road")
+	int32 GetBuildingRoadConnectionMask(FIntPoint RoadCell) const;
+
+	/** 등록 당시의 입구 또는 출구 앞 셀을 반환한다. 도로가 없어도 위치는 조회할 수 있다. */
+	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Road")
+	bool GetRegisteredBuildingRoadPort(AFactoryBuildingBase* Building, bool bEntrance, FIntPoint& OutRoadCell) const;
 	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Road")
 	ARoadNetworkActor* GetRoadNetworkAtCell(FIntPoint GridCoordinate) const;
 
@@ -95,6 +102,15 @@ public:
 	virtual void Deinitialize() override;
 
 private:
+	struct FRegisteredRoadPort
+	{
+		TWeakObjectPtr<AFactoryBuildingBase> Building;
+		bool bEntrance = false;
+		int32 Mask = 0;
+	};
+	TMap<FIntPoint, TArray<FRegisteredRoadPort>> BuildingRoadPorts;
+	TMap<TWeakObjectPtr<AFactoryBuildingBase>, TArray<FIntPoint>> RegisteredPortCells;
+	void RefreshRoadsAtPorts(const TArray<FIntPoint>& Cells);
 	friend class ARoadNetworkActor;
 	bool TryOccupyRoadCell(FIntPoint Cell, ARoadNetworkActor* Owner);
 	void ReleaseRoadCell(FIntPoint Cell, ARoadNetworkActor* Owner);

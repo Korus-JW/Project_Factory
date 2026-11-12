@@ -17,6 +17,14 @@ namespace
 	}
 	// 양의 Yaw는 동쪽을 북쪽으로 회전시킨다.
 	int32 RotateMask(int32 Mask) { return ((Mask >> 1) | ((Mask & 1) << 3)) & 15; }
+	// 신규 도로와 방향이 바뀐 도로 모두 같은 연결 규칙을 사용한다.
+	bool CanConnect(bool bHorizontal, const FRoadCellData& Other, int32 Direction)
+	{
+		const bool AlongNew = bHorizontal == (Direction % 2 == 1);
+		const bool AlongOther = Other.bHorizontal == (Direction % 2 == 1);
+		return Other.bHorizontal == bHorizontal ? AlongNew
+			: (Other.ConnectionMask == 0 ? AlongNew : (AlongNew || AlongOther));
+	}
 }
 ARoadNetworkActor::ARoadNetworkActor()
 {
@@ -38,18 +46,15 @@ bool ARoadNetworkActor::AddRoad(FIntPoint Cell, bool bHorizontal)
 	if (!Terrain || !Terrain->TryOccupyRoadCell(Cell, this)) return false;
 	FRoadCellData NewRoad; NewRoad.bHorizontal = bHorizontal;
 	TArray<int32> Connections;
+	TArray<FIntPoint> ChangedDirections;
 	for (int32 D = 0; D < 4; ++D)
 	{
 		FIntPoint OtherCell;
 		if (!Neighbor(Cell, D, OtherCell)) continue;
 		const FRoadCellData* Other = Roads.Find(OtherCell);
 		if (!Other) continue;
-		const bool AlongNew = bHorizontal == (D % 2 == 1);
-		const bool AlongOther = Other->bHorizontal == (D % 2 == 1);
 		// 평행 도로의 옆면은 연결하지 않는다. 독립된 다른 방향 도로에는 새 도로 방향을 우선한다.
-		const bool Connect = Other->bHorizontal == bHorizontal ? AlongNew
-			: (Other->ConnectionMask == 0 ? AlongNew : (AlongNew || AlongOther));
-		if (Connect) Connections.Add(D);
+		if (CanConnect(bHorizontal, *Other, D)) Connections.Add(D);
 	}
 	for (int32 D : Connections)
 	{
@@ -57,10 +62,42 @@ bool ARoadNetworkActor::AddRoad(FIntPoint Cell, bool bHorizontal)
 		NewRoad.ConnectionMask |= 1 << D;
 		FRoadCellData& Other = Roads.FindChecked(OtherCell);
 		// 고립된 도로는 새 연결 축으로 기본 방향도 바꿔 이후 배치와 철거에 반영한다.
-		if (Other.ConnectionMask == 0) Other.bHorizontal = (D % 2 == 1);
+		if (Other.ConnectionMask == 0 && Other.bHorizontal != (D % 2 == 1))
+		{
+			Other.bHorizontal = (D % 2 == 1);
+			ChangedDirections.Add(OtherCell);
+		}
 		Other.ConnectionMask |= 1 << ((D + 2) % 4);
 	}
 	Roads.Add(Cell, NewRoad);
+	// 방향 변경으로 새로 마주 보게 된 기존 이웃도 연결한다. 추가 방향 변경은 큐로 전파한다.
+	// 고립된 도로만 방향을 바꾸고 즉시 연결 비트를 기록하므로 같은 도로가 반복 회전하지 않는다.
+	for (int32 Index = 0; Index < ChangedDirections.Num(); ++Index)
+	{
+		const FIntPoint ChangedCell = ChangedDirections[Index];
+		FRoadCellData& Changed = Roads.FindChecked(ChangedCell);
+		TArray<int32> Reconnect;
+		for (int32 D = 0; D < 4; ++D)
+		{
+			FIntPoint OtherCell;
+			if ((Changed.ConnectionMask & (1 << D)) || !Neighbor(ChangedCell, D, OtherCell)) continue;
+			const auto* Other = Roads.Find(OtherCell);
+			if (Other && CanConnect(Changed.bHorizontal, *Other, D)) Reconnect.Add(D);
+		}
+		for (int32 D : Reconnect)
+		{
+			FIntPoint OtherCell;
+			Neighbor(ChangedCell, D, OtherCell);
+			auto& Other = Roads.FindChecked(OtherCell);
+			if (Other.ConnectionMask == 0 && Other.bHorizontal != (D % 2 == 1))
+			{
+				Other.bHorizontal = (D % 2 == 1);
+				ChangedDirections.Add(OtherCell);
+			}
+			Changed.ConnectionMask |= 1 << D;
+			Other.ConnectionMask |= 1 << ((D + 2) % 4);
+		}
+	}
 	RebuildVisuals(); return true;
 }
 bool ARoadNetworkActor::RemoveRoad(FIntPoint Cell)
@@ -118,9 +155,12 @@ void ARoadNetworkActor::RebuildVisuals()
 	UStaticMesh* Meshes[] = { StraightMesh,CornerMesh,TJunctionMesh,CrossMesh };
 	for (int32 I = 0; I < 4; ++I) { RoadInstances[I]->ClearInstances(); RoadInstances[I]->SetStaticMesh(Meshes[I]); }
 	const double CellSize = UTerrainDataLibrary::CellSize;
-	for (const auto& Pair : Roads)
+	const auto* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this);
+	for (auto& Pair : Roads)
 	{
-		int32 Type; float Yaw; ResolveVisual(Pair.Value.ConnectionMask, Pair.Value.bHorizontal, Type, Yaw);
+		Pair.Value.BuildingConnectionMask = Terrain ? Terrain->GetBuildingRoadConnectionMask(Pair.Key) : 0;
+		Pair.Value.VisualMask = Pair.Value.ConnectionMask | Pair.Value.BuildingConnectionMask;
+		int32 Type; float Yaw; ResolveVisual(Pair.Value.VisualMask, Pair.Value.bHorizontal, Type, Yaw);
 		UStaticMesh* Mesh = Meshes[Type]; if (!Mesh) continue;
 		const FBox Box = Mesh->GetBoundingBox();
 		const FVector MeshOriginOffset(250.0f, 250.0f, Box.Min.Z);

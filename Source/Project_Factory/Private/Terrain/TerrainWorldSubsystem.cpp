@@ -124,6 +124,8 @@ void UTerrainWorldSubsystem::ClearMap()
 	RoadOwners.Empty();
 	OccupiedCells.Empty();
 	RegisteredBuildingCells.Empty();
+	BuildingRoadPorts.Empty();
+	RegisteredPortCells.Empty();
 	Chunks.Empty();
 	ChunkDimensions = FIntPoint::ZeroValue;
 }
@@ -153,6 +155,14 @@ bool UTerrainWorldSubsystem::IsAreaFree(const TArray<FIntPoint>& GridCoordinates
 bool UTerrainWorldSubsystem::CanPlaceBuilding(AFactoryBuildingBase* Building,
 	FIntPoint AnchorGridCoordinate, int32 QuarterTurns) const
 {
+	if (!IsValid(Building)) return false;
+	for (bool bEntrance : {true, false})
+	{
+		const auto& Port = bEntrance ? Building->EntrancePort : Building->ExitPort;
+		FIntPoint RoadCell;
+		int32 Mask;
+		if (Port.bEnabled && !Building->GetRoadPort(bEntrance, AnchorGridCoordinate, QuarterTurns, RoadCell, Mask)) return false;
+	}
 	return IsValid(Building) && Building->GetWorld() == GetWorld()
 		&& Building->CanPlaceOnTerrain(AnchorGridCoordinate, QuarterTurns)
 		&& IsAreaFree(Building->GetFootprintCells(AnchorGridCoordinate, QuarterTurns));
@@ -168,6 +178,23 @@ bool UTerrainWorldSubsystem::TryRegisterBuilding(AFactoryBuildingBase* Building,
 		return false;
 	}
 
+	// 활성화한 연결점이 잘못된 경우 점유를 변경하기 전에 등록을 거절한다.
+	TArray<FIntPoint> PortCells;
+	TArray<FRegisteredRoadPort> Ports;
+	for (bool bEntrance : {true, false})
+	{
+		const FBuildingRoadPort& Config = bEntrance ? Building->EntrancePort : Building->ExitPort;
+		if (!Config.bEnabled) continue;
+		FIntPoint RoadCell;
+		int32 Mask;
+		if (!Building->GetRoadPort(bEntrance, AnchorGridCoordinate, QuarterTurns, RoadCell, Mask)) return false;
+		PortCells.Add(RoadCell);
+		FRegisteredRoadPort Port;
+		Port.Building = Building;
+		Port.bEntrance = bEntrance;
+		Port.Mask = Mask;
+		Ports.Add(Port);
+	}
 	// 검사가 끝난 뒤에만 모든 셀을 기록하므로 실패 시 부분 점유가 남지 않는다.
 	TArray<FIntPoint> Cells = Building->GetFootprintCells(AnchorGridCoordinate, QuarterTurns);
 	for (const FIntPoint& Coordinate : Cells)
@@ -175,6 +202,9 @@ bool UTerrainWorldSubsystem::TryRegisterBuilding(AFactoryBuildingBase* Building,
 		OccupiedCells.Add(Coordinate, Building);
 	}
 	RegisteredBuildingCells.Add(Building, MoveTemp(Cells));
+	for (int32 I = 0; I < PortCells.Num(); ++I) BuildingRoadPorts.FindOrAdd(PortCells[I]).Add(Ports[I]);
+	RegisteredPortCells.Add(Building, PortCells);
+	RefreshRoadsAtPorts(PortCells);
 	return true;
 }
 
@@ -199,7 +229,60 @@ bool UTerrainWorldSubsystem::UnregisterBuilding(AFactoryBuildingBase* Building)
 		}
 	}
 	RegisteredBuildingCells.Remove(Key);
+	TArray<FIntPoint> PortCells;
+	RegisteredPortCells.RemoveAndCopyValue(Key, PortCells);
+	for (const FIntPoint& Cell : PortCells)
+	{
+		if (auto* Ports = BuildingRoadPorts.Find(Cell))
+		{
+			Ports->RemoveAll([Key](const FRegisteredRoadPort& Port) { return Port.Building == Key; });
+			if (Ports->IsEmpty()) BuildingRoadPorts.Remove(Cell);
+		}
+	}
+	RefreshRoadsAtPorts(PortCells);
 	return true;
+}
+
+int32 UTerrainWorldSubsystem::GetBuildingRoadConnectionMask(FIntPoint RoadCell) const
+{
+	int32 Mask = 0;
+	if (const auto* Ports = BuildingRoadPorts.Find(RoadCell))
+	{
+		for (const auto& Port : *Ports) if (Port.Building.IsValid()) Mask |= Port.Mask;
+	}
+	return Mask;
+}
+
+bool UTerrainWorldSubsystem::GetRegisteredBuildingRoadPort(AFactoryBuildingBase* Building,
+	bool bEntrance, FIntPoint& OutRoadCell) const
+{
+	OutRoadCell = FIntPoint::ZeroValue;
+	if (!IsValid(Building)) return false;
+	if (const auto* Cells = RegisteredPortCells.Find(TWeakObjectPtr<AFactoryBuildingBase>(Building)))
+	{
+		for (const auto& Cell : *Cells)
+		{
+			if (const auto* Ports = BuildingRoadPorts.Find(Cell))
+			{
+				for (const auto& Port : *Ports)
+				{
+					if (Port.Building.Get() == Building && Port.bEntrance == bEntrance)
+					{
+						OutRoadCell = Cell;
+						return true;
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
+void UTerrainWorldSubsystem::RefreshRoadsAtPorts(const TArray<FIntPoint>& Cells)
+{
+	TSet<ARoadNetworkActor*> Owners;
+	for (const auto& Cell : Cells) if (auto* Owner = GetRoadNetworkAtCell(Cell)) Owners.Add(Owner);
+	for (auto* Owner : Owners) Owner->RebuildVisuals();
 }
 
 void UTerrainWorldSubsystem::Deinitialize()

@@ -13,6 +13,9 @@ struct FRoadCellData
  UPROPERTY(VisibleAnywhere, BlueprintReadOnly) bool bHorizontal = false;
  // 북=1, 동=2, 남=4, 서=8이며 실제 연결만 기록한다.
  UPROPERTY(VisibleAnywhere, BlueprintReadOnly) int32 ConnectionMask = 0;
+ // 건물 연결은 도로끼리의 연결 규칙과 별도로 관리한다.
+ UPROPERTY(VisibleAnywhere, BlueprintReadOnly) int32 BuildingConnectionMask = 0;
+ UPROPERTY(VisibleAnywhere, BlueprintReadOnly) int32 VisualMask = 0;
 };
 
 /** 도로 데이터와 표시를 관리한다. 같은 도로망은 하나의 액터에 등록한다. */

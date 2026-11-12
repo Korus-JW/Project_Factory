@@ -6,6 +6,36 @@
 #include "Terrain/TerrainDataLibrary.h"
 #include "Engine/StaticMesh.h"
 
+bool AFactoryBuildingBase::GetRoadPort(bool bEntrance, FIntPoint AnchorGridCoordinate,
+	int32 QuarterTurns, FIntPoint& OutRoadCell, int32& OutConnectionMask) const
+{
+	OutRoadCell = FIntPoint::ZeroValue;
+	OutConnectionMask = 0;
+	const FBuildingRoadPort& Port = bEntrance ? EntrancePort : ExitPort;
+	FIntPoint Size = GetFootprintSize();
+	FIntPoint Cell = Port.LocalCell;
+	int32 Direction = static_cast<int32>(Port.OutwardDirection);
+	if (!Port.bEnabled || Direction > 3 || Cell.X < 0 || Cell.Y < 0 || Cell.X >= Size.X || Cell.Y >= Size.Y) return false;
+	const FIntPoint Steps[] = { FIntPoint(0,1), FIntPoint(1,0), FIntPoint(0,-1), FIntPoint(-1,0) };
+	const FIntPoint Outside = Cell + Steps[Direction];
+	// 내부를 향하는 연결점은 허용하지 않는다.
+	if (Outside.X >= 0 && Outside.Y >= 0 && Outside.X < Size.X && Outside.Y < Size.Y) return false;
+	const int32 Turns = (QuarterTurns % 4 + 4) % 4;
+	for (int32 I = 0; I < Turns; ++I)
+	{
+		// 양의 Yaw로 회전한 뒤 새 점유 사각형의 최소 좌표를 원점으로 맞춘다.
+		Cell = FIntPoint(Size.Y - 1 - Cell.Y, Cell.X);
+		Size = FIntPoint(Size.Y, Size.X);
+		Direction = (Direction + 3) % 4;
+	}
+	const int64 X = int64(AnchorGridCoordinate.X) + Cell.X + Steps[Direction].X;
+	const int64 Y = int64(AnchorGridCoordinate.Y) + Cell.Y + Steps[Direction].Y;
+	if (X < MIN_int32 || X > MAX_int32 || Y < MIN_int32 || Y > MAX_int32) return false;
+	OutRoadCell = FIntPoint(int32(X), int32(Y));
+	OutConnectionMask = 1 << ((Direction + 2) % 4);
+	return true;
+}
+
 void AFactoryBuildingBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (UTerrainWorldSubsystem* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this))
