@@ -36,8 +36,34 @@ ARoadNetworkActor::ARoadNetworkActor()
 		auto* ISM = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Name);
 		ISM->SetupAttachment(RootComponent);
 		ISM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ISM->SetNumCustomDataFloats(1);
 		RoadInstances.Add(ISM);
 	}
+}
+void ARoadNetworkActor::ApplyRoadHighlight(FIntPoint Cell, float Value)
+{
+	if (const auto* Visual = VisualIndices.Find(Cell))
+	{
+		RoadInstances[Visual->Type]->SetCustomDataValue(Visual->InstanceIndex, 0, Value, true);
+	}
+}
+bool ARoadNetworkActor::SetHighlightedRoad(FIntPoint Cell)
+{
+	if (!Roads.Contains(Cell))
+	{
+		ClearHighlightedRoad();
+		return false;
+	}
+	if (HighlightedCell.IsSet() && HighlightedCell.GetValue() == Cell) return true;
+	ClearHighlightedRoad();
+	HighlightedCell = Cell;
+	ApplyRoadHighlight(Cell, 1.f);
+	return true;
+}
+void ARoadNetworkActor::ClearHighlightedRoad()
+{
+	if (HighlightedCell.IsSet()) ApplyRoadHighlight(HighlightedCell.GetValue(), 0.f);
+	HighlightedCell.Reset();
 }
 bool ARoadNetworkActor::AddRoad(FIntPoint Cell, bool bHorizontal)
 {
@@ -152,8 +178,16 @@ void ARoadNetworkActor::ResolveVisual(int32 Mask, bool bHorizontal, int32& OutTy
 }
 void ARoadNetworkActor::RebuildVisuals()
 {
+	VisualIndices.Empty();
+	if (HighlightedCell.IsSet() && !Roads.Contains(HighlightedCell.GetValue())) HighlightedCell.Reset();
 	UStaticMesh* Meshes[] = { StraightMesh,CornerMesh,TJunctionMesh,CrossMesh };
-	for (int32 I = 0; I < 4; ++I) { RoadInstances[I]->ClearInstances(); RoadInstances[I]->SetStaticMesh(Meshes[I]); }
+	for (int32 I = 0; I < 4; ++I)
+	{
+		RoadInstances[I]->ClearInstances();
+		// 기존 BP에 저장된 0 설정도 보정하며 다른 사용자 데이터 슬롯은 유지한다.
+		RoadInstances[I]->SetNumCustomDataFloats(FMath::Max(1, RoadInstances[I]->NumCustomDataFloats));
+		RoadInstances[I]->SetStaticMesh(Meshes[I]);
+	}
 	const double CellSize = UTerrainDataLibrary::CellSize;
 	const auto* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this);
 	for (auto& Pair : Roads)
@@ -166,7 +200,15 @@ void ARoadNetworkActor::RebuildVisuals()
 		const FVector MeshOriginOffset(250.0f, 250.0f, Box.Min.Z);
 		const FQuat Rotation = FRotator(0, Yaw, 0).Quaternion();
 		const FVector Center((double(Pair.Key.X) + 0.5) * CellSize, (double(Pair.Key.Y) + 0.5) * CellSize, SurfaceZ);
-		RoadInstances[Type]->AddInstance(FTransform(Rotation, Center - Rotation.RotateVector(MeshOriginOffset)), true);
+		const int32 Index = RoadInstances[Type]->AddInstance(FTransform(Rotation, Center - Rotation.RotateVector(MeshOriginOffset)), true);
+		if (Index != INDEX_NONE)
+		{
+			FRoadVisualIndex Visual;
+			Visual.Type = Type;
+			Visual.InstanceIndex = Index;
+			VisualIndices.Add(Pair.Key, Visual);
+			if (HighlightedCell.IsSet() && HighlightedCell.GetValue() == Pair.Key) ApplyRoadHighlight(Pair.Key, 1.f);
+		}
 	}
 }
 void ARoadNetworkActor::OnConstruction(const FTransform& Transform) 

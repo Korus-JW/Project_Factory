@@ -25,6 +25,9 @@ class PROJECT_FACTORY_API ARoadNetworkActor : public AActor
  GENERATED_BODY()
 public:
  ARoadNetworkActor();
+ // 한 셀을 강조하고 이전 선택을 해제한다. 도로가 없는 셀이면 선택을 해제하고 false를 반환한다.
+ UFUNCTION(BlueprintCallable, Category="Factory|Road|Highlight") bool SetHighlightedRoad(FIntPoint Cell);
+ UFUNCTION(BlueprintCallable, Category="Factory|Road|Highlight") void ClearHighlightedRoad();
  // 전체 격자 좌표를 사용하며 지형과 공통 점유를 검사한다. 비용은 호출자가 처리한다.
  UFUNCTION(BlueprintCallable, Category="Factory|Road") bool AddRoad(FIntPoint Cell, bool bHorizontal);
  UFUNCTION(BlueprintCallable, Category="Factory|Road") bool RemoveRoad(FIntPoint Cell);
@@ -47,5 +50,14 @@ protected:
  virtual void Destroyed() override;
  virtual void OnConstruction(const FTransform& Transform) override;
 private:
+ struct FRoadVisualIndex
+ {
+  int32 Type = 0;
+  int32 InstanceIndex = INDEX_NONE;
+ };
+ // ISM 재생성 때마다 갱신하며 외부에는 인덱스를 노출하지 않는다.
+ TMap<FIntPoint, FRoadVisualIndex> VisualIndices;
+ TOptional<FIntPoint> HighlightedCell;
+ void ApplyRoadHighlight(FIntPoint Cell, float Value);
  UPROPERTY(Transient, VisibleAnywhere, Category="Factory|Road") TMap<FIntPoint, FRoadCellData> Roads;
 };
