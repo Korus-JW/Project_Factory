@@ -60,7 +60,7 @@ public:
 	TArray<FIntPoint> GetFootprintCells(FIntPoint AnchorGridCoordinate, int32 QuarterTurns = 0) const;
 
 	/** 모든 점유 예정 셀이 생성된 지역에 있고 허용된 지형인지 검사한다.
-	 * 다른 건물의 점유와 비용, 자원 조건은 별도 배치 시스템에서 검사해야 한다. */
+	 * 자원 조건도 검사한다. 다른 건물의 점유와 비용은 별도 배치 시스템에서 검사한다. */
 	UFUNCTION(BlueprintPure, Category = "Factory|Building|Placement")
 	bool CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int32 QuarterTurns = 0) const;
 
@@ -117,6 +117,11 @@ public:
 	/** 일반 건물은 땅만 허용한다. 항구 등은 자식 클래스에서 조건을 확장할 수 있다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Factory|Building")
 	TArray<ETerrainType> AllowedTerrainTypes;
+
+	/** 일반 건물은 None, 벌목장은 Wood, 채석장은 Stone으로 설정한다.
+	 * 자원 건물은 일치하는 자원이 최소 한 칸 필요하며 빈 땅은 함께 점유할 수 있다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Factory|Building|Placement")
+	ECellResourceType RequiredResourceType = ECellResourceType::None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Factory|Building")
 	bool bCanBuild = false;

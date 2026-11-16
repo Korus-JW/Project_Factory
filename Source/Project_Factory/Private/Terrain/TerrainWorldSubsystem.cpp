@@ -201,10 +201,12 @@ bool UTerrainWorldSubsystem::TryRegisterBuilding(AFactoryBuildingBase* Building,
 	{
 		OccupiedCells.Add(Coordinate, Building);
 	}
-	RegisteredBuildingCells.Add(Building, MoveTemp(Cells));
+	// 이벤트 처리 중 등록 정보가 변경되어도 전달 배열이 유효하도록 지역 복사본을 유지한다.
+	RegisteredBuildingCells.Add(Building, Cells);
 	for (int32 I = 0; I < PortCells.Num(); ++I) BuildingRoadPorts.FindOrAdd(PortCells[I]).Add(Ports[I]);
 	RegisteredPortCells.Add(Building, PortCells);
 	RefreshRoadsAtPorts(PortCells);
+	OnCellOccupancyChanged.Broadcast(Cells);
 	return true;
 }
 
@@ -220,7 +222,8 @@ bool UTerrainWorldSubsystem::UnregisterBuilding(AFactoryBuildingBase* Building)
 	{
 		return false;
 	}
-	for (const FIntPoint& Coordinate : *Cells)
+	const TArray<FIntPoint> ChangedCells = *Cells;
+	for (const FIntPoint& Coordinate : ChangedCells)
 	{
 		const TWeakObjectPtr<AFactoryBuildingBase>* Occupant = OccupiedCells.Find(Coordinate);
 		if (Occupant && *Occupant == Key)
@@ -240,6 +243,7 @@ bool UTerrainWorldSubsystem::UnregisterBuilding(AFactoryBuildingBase* Building)
 		}
 	}
 	RefreshRoadsAtPorts(PortCells);
+	OnCellOccupancyChanged.Broadcast(ChangedCells);
 	return true;
 }
 
@@ -298,10 +302,28 @@ ARoadNetworkActor* UTerrainWorldSubsystem::GetRoadNetworkAtCell(FIntPoint GridCo
  return Owner && Owner->HasRoad(GridCoordinate) ? Owner : nullptr;
 }
 
+bool UTerrainWorldSubsystem::SetCellResource(FIntPoint GridCoordinate, ECellResourceType ResourceType)
+{
+	if (ResourceType != ECellResourceType::None && ResourceType != ECellResourceType::Wood
+		&& ResourceType != ECellResourceType::Stone) return false;
+	FGridCellData Existing;
+	if (!GetCellAtGridCoordinate(GridCoordinate, Existing) || Existing.TerrainType != ETerrainType::Land
+		|| GetBuildingAtCell(GridCoordinate) || GetRoadNetworkAtCell(GridCoordinate)) return false;
+	const FIntPoint ChunkCoordinate(DivideFloor(GridCoordinate.X, ChunkDimensions.X),
+		DivideFloor(GridCoordinate.Y, ChunkDimensions.Y));
+	FTerrainChunkData& Chunk = Chunks.FindChecked(ChunkCoordinate);
+	const int32 Index = UTerrainDataLibrary::GetCellIndex(Chunk,
+		PositiveRemainder(GridCoordinate.X, ChunkDimensions.X), PositiveRemainder(GridCoordinate.Y, ChunkDimensions.Y));
+	if (Index == INDEX_NONE) return false;
+	Chunk.Cells[Index].ResourceType = ResourceType;
+	return true;
+}
+
 bool UTerrainWorldSubsystem::CanPlaceRoad(FIntPoint GridCoordinate) const
 {
  FGridCellData Cell;
  return GetCellAtGridCoordinate(GridCoordinate, Cell) && Cell.TerrainType == ETerrainType::Land
+  && Cell.ResourceType == ECellResourceType::None
   && !GetBuildingAtCell(GridCoordinate) && !GetRoadNetworkAtCell(GridCoordinate);
 }
 

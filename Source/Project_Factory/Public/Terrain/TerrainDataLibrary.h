@@ -14,8 +14,8 @@ public:
 	/** Grid spacing in Unreal centimeters. */
 	static constexpr float CellSize = 500.0f;
 
-	/** Generates a flat test chunk. Rows with Y < WaterRows are water.
-	 * Dimensions outside 1..1024 fail with empty output; WaterRows is clamped. */
+	/** Y < WaterRows인 행은 물이며 땅의 약 10%씩 나무와 돌을 배치한다.
+	 * 같은 입력은 같은 분포를 만든다. 크기는 1~1024이며 WaterRows는 범위 안으로 보정한다. */
 	UFUNCTION(BlueprintCallable, Category = "Factory|Terrain")
 	static bool GenerateTestChunk(FIntPoint ChunkCoordinate, FTerrainChunkData& OutData,
 		int32 Width = 10, int32 Height = 10, int32 WaterRows = 2);

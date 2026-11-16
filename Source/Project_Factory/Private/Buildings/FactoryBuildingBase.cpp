@@ -117,6 +117,7 @@ bool AFactoryBuildingBase::CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int
 	{
 		return false;
 	}
+	bool bFoundRequiredResource = RequiredResourceType == ECellResourceType::None;
 	for (const FIntPoint& Coordinate : Cells)
 	{
 		FGridCellData Cell;
@@ -124,8 +125,13 @@ bool AFactoryBuildingBase::CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int
 		{
 			return false;
 		}
+		if (Cell.ResourceType != ECellResourceType::None)
+		{
+			if (Cell.TerrainType != ETerrainType::Land || Cell.ResourceType != RequiredResourceType) return false;
+			bFoundRequiredResource = true;
+		}
 	}
-	return true;
+	return bFoundRequiredResource;
 }
 
 void AFactoryBuildingBase::UpdateCanBuild(bool bInCanBuild)

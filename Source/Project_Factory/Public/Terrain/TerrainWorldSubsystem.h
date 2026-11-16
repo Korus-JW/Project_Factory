@@ -8,6 +8,8 @@
 class AFactoryBuildingBase;
 class ARoadNetworkActor;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCellOccupancyChanged, const TArray<FIntPoint>&, ChangedCells);
+
 /** 현재 월드의 청크 원본을 보관한다. 좌표는 월드 원점에서 +X, +Y 방향으로 증가한다. */
 UCLASS(BlueprintType)
 class PROJECT_FACTORY_API UTerrainWorldSubsystem : public UWorldSubsystem
@@ -15,6 +17,13 @@ class PROJECT_FACTORY_API UTerrainWorldSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
+	/** 건물 등록·해제 성공 후 전체 격자 좌표를 전달한다. 이벤트 안에서 최신 점유를 조회할 수 있다. */
+	UPROPERTY(BlueprintAssignable, Category = "Factory|Terrain|Building")
+	FOnCellOccupancyChanged OnCellOccupancyChanged;
+
+	/** 미점유 땅 셀의 자원을 변경한다. 청크를 생성한 뒤 호출하며 표시는 별도로 갱신한다. */
+	UFUNCTION(BlueprintCallable, Category = "Factory|Terrain|Resource")
+	bool SetCellResource(FIntPoint GridCoordinate, ECellResourceType ResourceType);
 	/** 해당 도로 셀에서 등록된 건물 입구·출구를 향하는 연결 비트다. */
 	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Road")
 	int32 GetBuildingRoadConnectionMask(FIntPoint RoadCell) const;

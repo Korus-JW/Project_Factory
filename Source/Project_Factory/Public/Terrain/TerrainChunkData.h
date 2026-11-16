@@ -10,6 +10,15 @@ enum class ETerrainType : uint8
 	Water
 };
 
+/** 지형과 별도로 관리하는 셀 자원이다. 자원은 땅에만 배치한다. */
+UENUM(BlueprintType)
+enum class ECellResourceType : uint8
+{
+	None,
+	Wood,
+	Stone
+};
+
 USTRUCT(BlueprintType)
 struct PROJECT_FACTORY_API FGridCellData
 {
@@ -17,6 +26,9 @@ struct PROJECT_FACTORY_API FGridCellData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
 	ETerrainType TerrainType = ETerrainType::Land;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain")
+	ECellResourceType ResourceType = ECellResourceType::None;
 };
 
 /** Row-major cells: Index = Y * Width + X. Empty by default until generated. */
