@@ -1,4 +1,6 @@
 #include "Buildings/FactoryBuildingBase.h"
+#include "Inventory/FactoryInventoryComponent.h"
+#include "Production/FactoryProductionComponent.h"
 
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -58,6 +60,8 @@ void AFactoryBuildingBase::Destroyed()
 AFactoryBuildingBase::AFactoryBuildingBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	Inventory = CreateDefaultSubobject<UFactoryInventoryComponent>(TEXT("Inventory"));
+	Production = CreateDefaultSubobject<UFactoryProductionComponent>(TEXT("Production"));
 
 	BuildingRoot = CreateDefaultSubobject<USceneComponent>(TEXT("BuildingRoot"));
 	SetRootComponent(BuildingRoot);

@@ -7,6 +7,8 @@
 
 class USceneComponent;
 class UStaticMeshComponent;
+class UFactoryInventoryComponent;
+class UFactoryProductionComponent;
 
 UENUM(BlueprintType)
 enum class EBuildingPortDirection : uint8
@@ -35,6 +37,14 @@ class PROJECT_FACTORY_API AFactoryBuildingBase : public AActor
 
 public:
 	AFactoryBuildingBase();
+
+	/** 건물마다 독립된 입력 재료와 출력 상품을 보관한다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Factory|Building|Components")
+	TObjectPtr<UFactoryInventoryComponent> Inventory;
+
+	/** 제작법에 따라 재료를 소비하고 상품을 생산한다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Factory|Building|Components")
+	TObjectPtr<UFactoryProductionComponent> Production;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Factory|Building|Road")
 	FBuildingRoadPort EntrancePort;
