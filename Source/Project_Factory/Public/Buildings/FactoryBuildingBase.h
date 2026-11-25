@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Terrain/TerrainChunkData.h"
+#include "FactoryGameLog.h"
 #include "FactoryBuildingBase.generated.h"
 
 class USceneComponent;
@@ -159,6 +160,7 @@ protected:
 
 
 private:
+	FFactoryOperationLog OperationLog;
 	UPROPERTY(Transient)
 	bool bPlacementPreview = false;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "FactoryGameLog.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "TerrainChunkData.h"
 #include "TerrainWorldSubsystem.generated.h"
@@ -111,6 +112,7 @@ public:
 	virtual void Deinitialize() override;
 
 private:
+	FFactoryOperationLog OperationLog;
 	struct FRegisteredRoadPort
 	{
 		TWeakObjectPtr<AFactoryBuildingBase> Building;

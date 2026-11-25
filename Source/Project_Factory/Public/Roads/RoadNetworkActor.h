@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "FactoryGameLog.h"
 #include "RoadNetworkActor.generated.h"
 
 class UInstancedStaticMeshComponent;
@@ -50,6 +51,7 @@ protected:
  virtual void Destroyed() override;
  virtual void OnConstruction(const FTransform& Transform) override;
 private:
+	FFactoryOperationLog OperationLog;
  struct FRoadVisualIndex
  {
   int32 Type = 0;

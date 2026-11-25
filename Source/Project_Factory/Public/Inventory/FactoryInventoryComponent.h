@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Items/FactoryItemAmount.h"
+#include "FactoryGameLog.h"
 #include "FactoryInventoryComponent.generated.h"
 
 /** 재료 입력과 완제품 출력을 서로 독립된 저장소로 구분한다. */
@@ -62,6 +63,7 @@ public:
 	bool TryConsumeItems(EFactoryInventorySlot Slot, const TArray<FFactoryItemAmount>& Items);
 
 private:
+	FFactoryOperationLog OperationLog;
 	/** 자식 건물 블루프린트의 컴포넌트 기본값에서 품목별로 설정한다. */
 	UPROPERTY(EditDefaultsOnly, Category = "Factory|Inventory", meta = (ClampMin = "0"))
 	TMap<FName, int32> InputCapacities;
@@ -77,7 +79,7 @@ private:
 	TMap<FName, int32> OutputItems;
 
 	static bool IsValidSlot(EFactoryInventorySlot Slot);
-	static bool AggregateItems(const TArray<FFactoryItemAmount>& Items, TMap<FName, int32>& OutTotals);
+	bool AggregateItems(const TArray<FFactoryItemAmount>& Items, TMap<FName, int32>& OutTotals) const;
 	const TMap<FName, int32>& GetStorage(EFactoryInventorySlot Slot) const;
 	TMap<FName, int32>& GetMutableStorage(EFactoryInventorySlot Slot);
 };

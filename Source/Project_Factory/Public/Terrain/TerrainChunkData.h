@@ -31,7 +31,7 @@ struct PROJECT_FACTORY_API FGridCellData
 	ECellResourceType ResourceType = ECellResourceType::None;
 };
 
-/** Row-major cells: Index = Y * Width + X. Empty by default until generated. */
+/** 셀은 행 우선 순서로 저장하며 인덱스는 Y * Width + X다. 생성 전에는 비어 있다. */
 USTRUCT(BlueprintType)
 struct PROJECT_FACTORY_API FTerrainChunkData
 {

@@ -1,8 +1,10 @@
 #include "Terrain/TerrainDataLibrary.h"
+#include "FactoryGameLog.h"
 
 namespace
 {
 	constexpr int32 MaxChunkDimension = 1024;
+	FFactoryOperationLog OperationLog;
 
 	bool AreDimensionsValid(int32 Width, int32 Height)
 	{
@@ -17,8 +19,9 @@ bool UTerrainDataLibrary::GenerateTestChunk(FIntPoint ChunkCoordinate, FTerrainC
 	OutData.ChunkCoordinate = ChunkCoordinate;
 	if (!AreDimensionsValid(Width, Height))
 	{
-		return false;
+		return OperationLog.Fail(GetDefault<UTerrainDataLibrary>(), TEXT("GenerateTestChunk"), TEXT("Chunk dimensions must be within 1..1024."), FString::Printf(TEXT("Chunk=%s Width=%d Height=%d"), *ChunkCoordinate.ToString(), Width, Height));
 	}
+	OperationLog.Succeed(TEXT("GenerateTestChunk"));
 
 	OutData.Width = Width;
 	OutData.Height = Height;
@@ -62,8 +65,10 @@ int32 UTerrainDataLibrary::GetCellIndex(const FTerrainChunkData& Data, int32 X, 
 {
 	if (!IsValidChunk(Data) || X < 0 || Y < 0 || X >= Data.Width || Y >= Data.Height)
 	{
+		OperationLog.Fail(GetDefault<UTerrainDataLibrary>(), TEXT("GetCellIndex"), TEXT("Invalid chunk data or cell coordinates."), FString::Printf(TEXT("Chunk=%s Cell=(%d,%d) Dimensions=(%d,%d) Cells=%d"), *Data.ChunkCoordinate.ToString(), X, Y, Data.Width, Data.Height, Data.Cells.Num()));
 		return INDEX_NONE;
 	}
+	OperationLog.Succeed(TEXT("GetCellIndex"));
 	return Y * Data.Width + X;
 }
 

@@ -17,11 +17,19 @@ bool AFactoryBuildingBase::GetRoadPort(bool bEntrance, FIntPoint AnchorGridCoord
 	FIntPoint Size = GetFootprintSize();
 	FIntPoint Cell = Port.LocalCell;
 	int32 Direction = static_cast<int32>(Port.OutwardDirection);
-	if (!Port.bEnabled || Direction > 3 || Cell.X < 0 || Cell.Y < 0 || Cell.X >= Size.X || Cell.Y >= Size.Y) return false;
+	const FName Operation = bEntrance ? TEXT("GetEntranceRoadPort") : TEXT("GetExitRoadPort");
+	if (!Port.bEnabled || Direction > 3 || Cell.X < 0 || Cell.Y < 0 || Cell.X >= Size.X || Cell.Y >= Size.Y)
+	{
+		return OperationLog.Fail(this, Operation, TEXT("Port is disabled or its local cell/direction is invalid."),
+			FString::Printf(TEXT("Cell=%s Direction=%d Size=%s"), *Cell.ToString(), Direction, *Size.ToString()));
+	}
 	const FIntPoint Steps[] = { FIntPoint(0,1), FIntPoint(1,0), FIntPoint(0,-1), FIntPoint(-1,0) };
 	const FIntPoint Outside = Cell + Steps[Direction];
 	// 내부를 향하는 연결점은 허용하지 않는다.
-	if (Outside.X >= 0 && Outside.Y >= 0 && Outside.X < Size.X && Outside.Y < Size.Y) return false;
+	if (Outside.X >= 0 && Outside.Y >= 0 && Outside.X < Size.X && Outside.Y < Size.Y)
+	{
+		return OperationLog.Fail(this, Operation, TEXT("Port must face outside the building footprint."), Cell.ToString());
+	}
 	const int32 Turns = (QuarterTurns % 4 + 4) % 4;
 	for (int32 I = 0; I < Turns; ++I)
 	{
@@ -32,7 +40,11 @@ bool AFactoryBuildingBase::GetRoadPort(bool bEntrance, FIntPoint AnchorGridCoord
 	}
 	const int64 X = int64(AnchorGridCoordinate.X) + Cell.X + Steps[Direction].X;
 	const int64 Y = int64(AnchorGridCoordinate.Y) + Cell.Y + Steps[Direction].Y;
-	if (X < MIN_int32 || X > MAX_int32 || Y < MIN_int32 || Y > MAX_int32) return false;
+	if (X < MIN_int32 || X > MAX_int32 || Y < MIN_int32 || Y > MAX_int32)
+	{
+		return OperationLog.Fail(this, Operation, TEXT("Road port coordinate exceeds int32 range."), AnchorGridCoordinate.ToString());
+	}
+	OperationLog.Succeed(Operation);
 	OutRoadCell = FIntPoint(int32(X), int32(Y));
 	OutConnectionMask = 1 << ((Direction + 2) % 4);
 	return true;
@@ -96,8 +108,10 @@ TArray<FIntPoint> AFactoryBuildingBase::GetFootprintCells(FIntPoint AnchorGridCo
 	if (static_cast<int64>(AnchorGridCoordinate.X) + Size.X - 1 > MAX_int32
 		|| static_cast<int64>(AnchorGridCoordinate.Y) + Size.Y - 1 > MAX_int32)
 	{
+		OperationLog.Fail(this, TEXT("GetFootprintCells"), TEXT("Footprint coordinates exceed int32 range."), AnchorGridCoordinate.ToString());
 		return Cells;
 	}
+	OperationLog.Succeed(TEXT("GetFootprintCells"));
 	Cells.Reserve(Size.X * Size.Y);
 	for (int32 Y = 0; Y < Size.Y; ++Y)
 	{
@@ -112,30 +126,33 @@ TArray<FIntPoint> AFactoryBuildingBase::GetFootprintCells(FIntPoint AnchorGridCo
 bool AFactoryBuildingBase::CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int32 QuarterTurns) const
 {
 	const UTerrainWorldSubsystem* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this);
-	if (!Terrain)
-	{
-		return false;
-	}
+	if (!Terrain) return false;
 	const TArray<FIntPoint> Cells = GetFootprintCells(AnchorGridCoordinate, QuarterTurns);
-	if (Cells.IsEmpty())
-	{
-		return false;
-	}
+	if (Cells.IsEmpty()) return false;
 	bool bFoundRequiredResource = RequiredResourceType == ECellResourceType::None;
 	for (const FIntPoint& Coordinate : Cells)
 	{
 		FGridCellData Cell;
-		if (!Terrain->GetCellAtGridCoordinate(Coordinate, Cell) || !IsTerrainAllowed(Cell.TerrainType))
+		if (!Terrain->GetCellAtGridCoordinate(Coordinate, Cell)) return false;
+		if (!IsTerrainAllowed(Cell.TerrainType))
 		{
-			return false;
+			return OperationLog.Fail(this, TEXT("CanPlaceOnTerrain"), TEXT("Terrain type is not allowed."), Coordinate.ToString());
 		}
 		if (Cell.ResourceType != ECellResourceType::None)
 		{
-			if (Cell.TerrainType != ETerrainType::Land || Cell.ResourceType != RequiredResourceType) return false;
+			if (Cell.TerrainType != ETerrainType::Land || Cell.ResourceType != RequiredResourceType)
+			{
+				return OperationLog.Fail(this, TEXT("CanPlaceOnTerrain"), TEXT("Cell resource is incompatible with the building."), Coordinate.ToString());
+			}
 			bFoundRequiredResource = true;
 		}
 	}
-	return bFoundRequiredResource;
+	if (!bFoundRequiredResource)
+	{
+		return OperationLog.Fail(this, TEXT("CanPlaceOnTerrain"), TEXT("Required resource is missing from the footprint."), AnchorGridCoordinate.ToString());
+	}
+	OperationLog.Succeed(TEXT("CanPlaceOnTerrain"));
+	return true;
 }
 
 void AFactoryBuildingBase::UpdateCanBuild(bool bInCanBuild)
@@ -166,6 +183,7 @@ void AFactoryBuildingBase::SetPlacementPreview(bool bPreview)
 		SetActorEnableCollision(bCollisionEnabledBeforePreview);
 	}
 
+	UE_LOG(LogFactoryGame, Log, TEXT("Placement preview changed [Building=%s Preview=%d]"), *GetPathName(), bPreview);
 	bPlacementPreview = bPreview;
 	OnPlacementPreviewChanged(bPreview);
 }

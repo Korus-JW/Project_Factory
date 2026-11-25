@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Production/FactoryRecipeDefinition.h"
+#include "FactoryGameLog.h"
 #include "FactoryProductionComponent.generated.h"
 
 class UFactoryInventoryComponent;
@@ -62,6 +63,8 @@ protected:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	FFactoryOperationLog OperationLog;
+	void SetState(EFactoryProductionState NewState, const FString& Reason);
 	friend class FFactoryProductionTest;
 	friend class FFactoryRecipeSelectionTest;
 	UPROPERTY(Transient) FDataTableRowHandle SelectedRecipe;

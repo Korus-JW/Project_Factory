@@ -24,17 +24,30 @@ namespace
 UTerrainWorldSubsystem* UTerrainWorldSubsystem::GetTerrainWorldSubsystem(const UObject* WorldContextObject)
 {
 	UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
-	return World ? World->GetSubsystem<UTerrainWorldSubsystem>() : nullptr;
+	UTerrainWorldSubsystem* Subsystem = World ? World->GetSubsystem<UTerrainWorldSubsystem>() : nullptr;
+	static FFactoryOperationLog ContextLog;
+	if (!Subsystem)
+	{
+		ContextLog.Fail(WorldContextObject, TEXT("GetTerrainWorldSubsystem"), TEXT("World context or terrain subsystem is unavailable."));
+	}
+	else
+	{
+		ContextLog.Succeed(TEXT("GetTerrainWorldSubsystem"));
+	}
+	return Subsystem;
 }
 
 bool UTerrainWorldSubsystem::GenerateTestChunk(FIntPoint ChunkCoordinate, FTerrainChunkData& OutData,
 	int32 Width, int32 Height, int32 WaterRows, bool bReplaceExisting)
 {
 	OutData = FTerrainChunkData();
-	if ((!bReplaceExisting && Chunks.Contains(ChunkCoordinate))
-		|| (Chunks.Num() > 0 && ChunkDimensions != FIntPoint(Width, Height)))
+	if (!bReplaceExisting && Chunks.Contains(ChunkCoordinate))
 	{
-		return false;
+		return OperationLog.Fail(this, TEXT("GenerateTestChunk"), TEXT("Chunk already exists and replacement is disabled."), ChunkCoordinate.ToString());
+	}
+	if (Chunks.Num() > 0 && ChunkDimensions != FIntPoint(Width, Height))
+	{
+		return OperationLog.Fail(this, TEXT("GenerateTestChunk"), TEXT("Dimensions differ from the existing map."), FString::Printf(TEXT("Requested=(%d,%d) Existing=%s"), Width, Height, *ChunkDimensions.ToString()));
 	}
 
 	if (!UTerrainDataLibrary::GenerateTestChunk(ChunkCoordinate, OutData, Width, Height, WaterRows))
@@ -44,6 +57,8 @@ bool UTerrainWorldSubsystem::GenerateTestChunk(FIntPoint ChunkCoordinate, FTerra
 
 	ChunkDimensions = FIntPoint(Width, Height);
 	Chunks.Add(ChunkCoordinate, OutData);
+	OperationLog.Succeed(TEXT("GenerateTestChunk"));
+	UE_LOG(LogFactoryGame, Log, TEXT("Terrain chunk generated [Chunk=%s Dimensions=(%d,%d)]"), *ChunkCoordinate.ToString(), Width, Height);
 	return true;
 }
 
@@ -51,7 +66,9 @@ bool UTerrainWorldSubsystem::GetChunk(FIntPoint ChunkCoordinate, FTerrainChunkDa
 {
 	const FTerrainChunkData* Chunk = Chunks.Find(ChunkCoordinate);
 	OutData = Chunk ? *Chunk : FTerrainChunkData();
-	return Chunk != nullptr;
+	if (!Chunk) return OperationLog.Fail(this, TEXT("GetChunk"), TEXT("Chunk has not been generated."), ChunkCoordinate.ToString());
+	OperationLog.Succeed(TEXT("GetChunk"));
+	return true;
 }
 
 bool UTerrainWorldSubsystem::HasChunk(FIntPoint ChunkCoordinate) const
@@ -63,7 +80,9 @@ bool UTerrainWorldSubsystem::GetCell(FIntPoint ChunkCoordinate, int32 X, int32 Y
 {
 	OutCell = FGridCellData();
 	const FTerrainChunkData* Chunk = Chunks.Find(ChunkCoordinate);
-	return Chunk && UTerrainDataLibrary::GetCell(*Chunk, X, Y, OutCell);
+	if (!Chunk) return OperationLog.Fail(this, TEXT("GetCell"), TEXT("Chunk has not been generated."), ChunkCoordinate.ToString());
+	OperationLog.Succeed(TEXT("GetCell"));
+	return UTerrainDataLibrary::GetCell(*Chunk, X, Y, OutCell);
 }
 
 bool UTerrainWorldSubsystem::GetCellAtGridCoordinate(FIntPoint GridCoordinate, FGridCellData& OutCell) const
@@ -71,9 +90,10 @@ bool UTerrainWorldSubsystem::GetCellAtGridCoordinate(FIntPoint GridCoordinate, F
 	OutCell = FGridCellData();
 	if (ChunkDimensions.X <= 0 || ChunkDimensions.Y <= 0)
 	{
-		return false;
+		return OperationLog.Fail(this, TEXT("GetCellAtGridCoordinate"), TEXT("Chunk dimensions are not initialized."));
 	}
 
+	OperationLog.Succeed(TEXT("GetCellAtGridCoordinate"));
 	const FIntPoint ChunkCoordinate(DivideFloor(GridCoordinate.X, ChunkDimensions.X),
 		DivideFloor(GridCoordinate.Y, ChunkDimensions.Y));
 	return GetCell(ChunkCoordinate, PositiveRemainder(GridCoordinate.X, ChunkDimensions.X),
@@ -105,8 +125,9 @@ bool UTerrainWorldSubsystem::GetChunkWorldOrigin(FIntPoint ChunkCoordinate, FVec
 	OutOrigin = FVector::ZeroVector;
 	if (ChunkDimensions.X <= 0 || ChunkDimensions.Y <= 0)
 	{
-		return false;
+		return OperationLog.Fail(this, TEXT("GetChunkWorldOrigin"), TEXT("Chunk dimensions are not initialized."));
 	}
+	OperationLog.Succeed(TEXT("GetChunkWorldOrigin"));
 	OutOrigin = FVector(static_cast<double>(ChunkCoordinate.X) * ChunkDimensions.X * UTerrainDataLibrary::CellSize,
 		static_cast<double>(ChunkCoordinate.Y) * ChunkDimensions.Y * UTerrainDataLibrary::CellSize, 0.0);
 	return true;
@@ -140,22 +161,23 @@ bool UTerrainWorldSubsystem::IsAreaFree(const TArray<FIntPoint>& GridCoordinates
 {
 	if (GridCoordinates.IsEmpty())
 	{
-		return false;
+		return OperationLog.Fail(this, TEXT("IsAreaFree"), TEXT("Footprint has no cells."));
 	}
 	for (const FIntPoint& Coordinate : GridCoordinates)
 	{
 		if (GetBuildingAtCell(Coordinate) || GetRoadNetworkAtCell(Coordinate))
 		{
-			return false;
+			return OperationLog.Fail(this, TEXT("IsAreaFree"), TEXT("Cell is occupied by a building or road."), Coordinate.ToString());
 		}
 	}
+	OperationLog.Succeed(TEXT("IsAreaFree"));
 	return true;
 }
 
 bool UTerrainWorldSubsystem::CanPlaceBuilding(AFactoryBuildingBase* Building,
 	FIntPoint AnchorGridCoordinate, int32 QuarterTurns) const
 {
-	if (!IsValid(Building)) return false;
+	if (!IsValid(Building)) return OperationLog.Fail(this, TEXT("BuildingValidation"), TEXT("Building is null or invalid."));
 	for (bool bEntrance : {true, false})
 	{
 		const auto& Port = bEntrance ? Building->EntrancePort : Building->ExitPort;
@@ -163,20 +185,26 @@ bool UTerrainWorldSubsystem::CanPlaceBuilding(AFactoryBuildingBase* Building,
 		int32 Mask;
 		if (Port.bEnabled && !Building->GetRoadPort(bEntrance, AnchorGridCoordinate, QuarterTurns, RoadCell, Mask)) return false;
 	}
-	return IsValid(Building) && Building->GetWorld() == GetWorld()
-		&& Building->CanPlaceOnTerrain(AnchorGridCoordinate, QuarterTurns)
+	if (Building->GetWorld() != GetWorld())
+	{
+		return OperationLog.Fail(this, TEXT("BuildingValidation"), TEXT("Building belongs to a different world."), Building->GetPathName());
+	}
+	OperationLog.Succeed(TEXT("BuildingValidation"));
+	return Building->CanPlaceOnTerrain(AnchorGridCoordinate, QuarterTurns)
 		&& IsAreaFree(Building->GetFootprintCells(AnchorGridCoordinate, QuarterTurns));
 }
 
 bool UTerrainWorldSubsystem::TryRegisterBuilding(AFactoryBuildingBase* Building,
 	FIntPoint AnchorGridCoordinate, int32 QuarterTurns)
 {
-	if (!IsValid(Building) || Building->IsPlacementPreview()
-		|| RegisteredBuildingCells.Contains(TWeakObjectPtr<AFactoryBuildingBase>(Building))
-		|| !CanPlaceBuilding(Building, AnchorGridCoordinate, QuarterTurns))
+	if (!IsValid(Building)) return OperationLog.Fail(this, TEXT("TryRegisterBuilding"), TEXT("Building is null or invalid."));
+	if (Building->IsPlacementPreview()) return OperationLog.Fail(this, TEXT("TryRegisterBuilding"), TEXT("Placement previews cannot be registered."), Building->GetPathName());
+	if (RegisteredBuildingCells.Contains(TWeakObjectPtr<AFactoryBuildingBase>(Building)))
 	{
-		return false;
+		return OperationLog.Fail(this, TEXT("TryRegisterBuilding"), TEXT("Building is already registered."), Building->GetPathName());
 	}
+	if (!CanPlaceBuilding(Building, AnchorGridCoordinate, QuarterTurns)) return false;
+	OperationLog.Succeed(TEXT("TryRegisterBuilding"));
 
 	// 활성화한 연결점이 잘못된 경우 점유를 변경하기 전에 등록을 거절한다.
 	TArray<FIntPoint> PortCells;
@@ -206,22 +234,22 @@ bool UTerrainWorldSubsystem::TryRegisterBuilding(AFactoryBuildingBase* Building,
 	for (int32 I = 0; I < PortCells.Num(); ++I) BuildingRoadPorts.FindOrAdd(PortCells[I]).Add(Ports[I]);
 	RegisteredPortCells.Add(Building, PortCells);
 	RefreshRoadsAtPorts(PortCells);
+	UE_LOG(LogFactoryGame, Log, TEXT("Building registered [Building=%s Anchor=%s Rotation=%d Cells=%d]"), *Building->GetPathName(), *AnchorGridCoordinate.ToString(), QuarterTurns, Cells.Num());
 	OnCellOccupancyChanged.Broadcast(Cells);
 	return true;
 }
 
 bool UTerrainWorldSubsystem::UnregisterBuilding(AFactoryBuildingBase* Building)
 {
-	if (!Building)
-	{
-		return false;
-	}
+	if (!Building) return OperationLog.Fail(this, TEXT("UnregisterBuilding"), TEXT("Building is null."));
 	const TWeakObjectPtr<AFactoryBuildingBase> Key(Building);
 	const TArray<FIntPoint>* Cells = RegisteredBuildingCells.Find(Key);
 	if (!Cells)
 	{
+		OperationLog.Fail(this, TEXT("UnregisterBuilding"), TEXT("Building has no registered occupancy."), Building->GetPathName());
 		return false;
 	}
+	OperationLog.Succeed(TEXT("UnregisterBuilding"));
 	const TArray<FIntPoint> ChangedCells = *Cells;
 	for (const FIntPoint& Coordinate : ChangedCells)
 	{
@@ -243,6 +271,7 @@ bool UTerrainWorldSubsystem::UnregisterBuilding(AFactoryBuildingBase* Building)
 		}
 	}
 	RefreshRoadsAtPorts(PortCells);
+	UE_LOG(LogFactoryGame, Log, TEXT("Building unregistered [Building=%s Cells=%d]"), *Building->GetPathName(), ChangedCells.Num());
 	OnCellOccupancyChanged.Broadcast(ChangedCells);
 	return true;
 }
@@ -261,7 +290,7 @@ bool UTerrainWorldSubsystem::GetRegisteredBuildingRoadPort(AFactoryBuildingBase*
 	bool bEntrance, FIntPoint& OutRoadCell) const
 {
 	OutRoadCell = FIntPoint::ZeroValue;
-	if (!IsValid(Building)) return false;
+	if (!IsValid(Building)) return OperationLog.Fail(this, TEXT("BuildingValidation"), TEXT("Building is null or invalid."));
 	if (const auto* Cells = RegisteredPortCells.Find(TWeakObjectPtr<AFactoryBuildingBase>(Building)))
 	{
 		for (const auto& Cell : *Cells)
@@ -272,6 +301,7 @@ bool UTerrainWorldSubsystem::GetRegisteredBuildingRoadPort(AFactoryBuildingBase*
 				{
 					if (Port.Building.Get() == Building && Port.bEntrance == bEntrance)
 					{
+						OperationLog.Succeed(TEXT("GetRegisteredBuildingRoadPort"));
 						OutRoadCell = Cell;
 						return true;
 					}
@@ -279,7 +309,7 @@ bool UTerrainWorldSubsystem::GetRegisteredBuildingRoadPort(AFactoryBuildingBase*
 			}
 		}
 	}
-	return false;
+	return OperationLog.Fail(this, TEXT("GetRegisteredBuildingRoadPort"), TEXT("Requested entrance or exit is not registered."), FString::Printf(TEXT("Building=%s Entrance=%d"), *Building->GetPathName(), bEntrance));
 }
 
 void UTerrainWorldSubsystem::RefreshRoadsAtPorts(const TArray<FIntPoint>& Cells)
@@ -305,10 +335,13 @@ ARoadNetworkActor* UTerrainWorldSubsystem::GetRoadNetworkAtCell(FIntPoint GridCo
 bool UTerrainWorldSubsystem::SetCellResource(FIntPoint GridCoordinate, ECellResourceType ResourceType)
 {
 	if (ResourceType != ECellResourceType::None && ResourceType != ECellResourceType::Wood
-		&& ResourceType != ECellResourceType::Stone) return false;
+		&& ResourceType != ECellResourceType::Stone) return OperationLog.Fail(this, TEXT("SetCellResource"), TEXT("Unsupported resource type."), FString::FromInt(int32(ResourceType)));
 	FGridCellData Existing;
-	if (!GetCellAtGridCoordinate(GridCoordinate, Existing) || Existing.TerrainType != ETerrainType::Land
-		|| GetBuildingAtCell(GridCoordinate) || GetRoadNetworkAtCell(GridCoordinate)) return false;
+	if (!GetCellAtGridCoordinate(GridCoordinate, Existing)) return false;
+	if (Existing.TerrainType != ETerrainType::Land || GetBuildingAtCell(GridCoordinate) || GetRoadNetworkAtCell(GridCoordinate))
+	{
+		return OperationLog.Fail(this, TEXT("SetCellResource"), TEXT("Resource requires an unoccupied land cell."), GridCoordinate.ToString());
+	}
 	const FIntPoint ChunkCoordinate(DivideFloor(GridCoordinate.X, ChunkDimensions.X),
 		DivideFloor(GridCoordinate.Y, ChunkDimensions.Y));
 	FTerrainChunkData& Chunk = Chunks.FindChecked(ChunkCoordinate);
@@ -316,20 +349,32 @@ bool UTerrainWorldSubsystem::SetCellResource(FIntPoint GridCoordinate, ECellReso
 		PositiveRemainder(GridCoordinate.X, ChunkDimensions.X), PositiveRemainder(GridCoordinate.Y, ChunkDimensions.Y));
 	if (Index == INDEX_NONE) return false;
 	Chunk.Cells[Index].ResourceType = ResourceType;
+	OperationLog.Succeed(TEXT("SetCellResource"));
+	UE_LOG(LogFactoryGame, Log, TEXT("Cell resource changed [Cell=%s Resource=%d]"), *GridCoordinate.ToString(), int32(ResourceType));
 	return true;
 }
 
 bool UTerrainWorldSubsystem::CanPlaceRoad(FIntPoint GridCoordinate) const
 {
  FGridCellData Cell;
- return GetCellAtGridCoordinate(GridCoordinate, Cell) && Cell.TerrainType == ETerrainType::Land
-  && Cell.ResourceType == ECellResourceType::None
-  && !GetBuildingAtCell(GridCoordinate) && !GetRoadNetworkAtCell(GridCoordinate);
+ if (!GetCellAtGridCoordinate(GridCoordinate, Cell)) return false;
+ if (Cell.TerrainType != ETerrainType::Land || Cell.ResourceType != ECellResourceType::None
+  || GetBuildingAtCell(GridCoordinate) || GetRoadNetworkAtCell(GridCoordinate))
+ {
+  return OperationLog.Fail(this, TEXT("CanPlaceRoad"), TEXT("Road requires unoccupied land without resources."), GridCoordinate.ToString());
+ }
+ OperationLog.Succeed(TEXT("CanPlaceRoad"));
+ return true;
 }
 
 bool UTerrainWorldSubsystem::TryOccupyRoadCell(FIntPoint Cell, ARoadNetworkActor* Owner)
 {
- if (!IsValid(Owner) || Owner->GetWorld() != GetWorld() || !CanPlaceRoad(Cell)) return false;
+ if (!IsValid(Owner) || Owner->GetWorld() != GetWorld())
+ {
+  return OperationLog.Fail(this, TEXT("TryOccupyRoadCell"), TEXT("Road owner is invalid or belongs to another world."), Cell.ToString());
+ }
+ if (!CanPlaceRoad(Cell)) return false;
+ OperationLog.Succeed(TEXT("TryOccupyRoadCell"));
  RoadOwners.Add(Cell, Owner);
  return true;
 }
