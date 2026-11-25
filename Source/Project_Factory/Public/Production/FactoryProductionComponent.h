@@ -67,15 +67,31 @@ private:
 	void SetState(EFactoryProductionState NewState, const FString& Reason);
 	friend class FFactoryProductionTest;
 	friend class FFactoryRecipeSelectionTest;
-	UPROPERTY(Transient) FDataTableRowHandle SelectedRecipe;
-	UPROPERTY(Transient) FDataTableRowHandle PendingRecipe;
-	UPROPERTY(Transient) FFactoryRecipeDefinition PendingRecipeDefinition;
+	UPROPERTY(Transient) 
+	FDataTableRowHandle SelectedRecipe;
+
+	UPROPERTY(Transient) 
+	FDataTableRowHandle PendingRecipe;
+
+	UPROPERTY(Transient) 
+	FFactoryRecipeDefinition PendingRecipeDefinition;
+
 	bool bHasPendingRecipe = false;
+
 	void ApplyPendingRecipe();
-	UPROPERTY(Transient) TObjectPtr<UFactoryInventoryComponent> Inventory;
-	UPROPERTY(Transient) FFactoryRecipeDefinition ActiveRecipe;
-	UPROPERTY(Transient) TArray<FFactoryItemAmount> PendingOutputs;
-	UPROPERTY(EditDefaultsOnly, Category = "Factory|Production") bool bProductionEnabled = true;
+
+	UPROPERTY(Transient) 
+	TObjectPtr<UFactoryInventoryComponent> Inventory;
+
+	UPROPERTY(Transient)
+	FFactoryRecipeDefinition ActiveRecipe;
+
+	UPROPERTY(Transient)
+	TArray<FFactoryItemAmount> PendingOutputs;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Factory|Production")
+	bool bProductionEnabled = true;
+
 	EFactoryProductionState State = EFactoryProductionState::NoRecipe;
 	bool bHasRecipe = false;
 	bool bWorking = false;

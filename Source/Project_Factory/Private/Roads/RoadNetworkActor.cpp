@@ -1,4 +1,5 @@
 #include "Roads/RoadNetworkActor.h"
+#include "Logging/FactoryLogComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Engine/StaticMesh.h"
@@ -29,6 +30,7 @@ namespace
 ARoadNetworkActor::ARoadNetworkActor()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	FactoryLog = CreateDefaultSubobject<UFactoryLogComponent>(TEXT("FactoryLog"));
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("RoadRoot")));
 	const TCHAR* Names[] = { TEXT("StraightISM"),TEXT("CornerISM"),TEXT("TJunctionISM"),TEXT("CrossISM") };
 	for (const TCHAR* Name : Names)
@@ -48,19 +50,19 @@ void ARoadNetworkActor::ApplyRoadHighlight(FIntPoint Cell, float Value)
 	}
 	else
 	{
-		OperationLog.Fail(this, TEXT("ApplyRoadHighlight"), TEXT("Road has no visual instance; verify the assigned road meshes."), Cell.ToString());
+		FactoryLog->ReportFailure(TEXT("ApplyRoadHighlight"), TEXT("Road has no visual instance; verify the assigned road meshes."), Cell.ToString());
 		return;
 	}
-	OperationLog.Succeed(TEXT("ApplyRoadHighlight"));
+	FactoryLog->ClearFailure(TEXT("ApplyRoadHighlight"));
 }
 bool ARoadNetworkActor::SetHighlightedRoad(FIntPoint Cell)
 {
 	if (!Roads.Contains(Cell))
 	{
 		ClearHighlightedRoad();
-		return OperationLog.Fail(this, TEXT("SetHighlightedRoad"), TEXT("No road exists at the requested cell."), Cell.ToString());
+		return FactoryLog->ReportFailure(TEXT("SetHighlightedRoad"), TEXT("No road exists at the requested cell."), Cell.ToString());
 	}
-	OperationLog.Succeed(TEXT("SetHighlightedRoad"));
+	FactoryLog->ClearFailure(TEXT("SetHighlightedRoad"));
 	if (HighlightedCell.IsSet() && HighlightedCell.GetValue() == Cell) return true;
 	ClearHighlightedRoad();
 	HighlightedCell = Cell;
@@ -74,10 +76,10 @@ void ARoadNetworkActor::ClearHighlightedRoad()
 }
 bool ARoadNetworkActor::AddRoad(FIntPoint Cell, bool bHorizontal)
 {
-	if (Roads.Contains(Cell)) return OperationLog.Fail(this, TEXT("AddRoad"), TEXT("Road already exists."), Cell.ToString());
+	if (Roads.Contains(Cell)) return FactoryLog->ReportFailure(TEXT("AddRoad"), TEXT("Road already exists."), Cell.ToString());
 	auto* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this);
 	if (!Terrain || !Terrain->TryOccupyRoadCell(Cell, this)) return false;
-	OperationLog.Succeed(TEXT("AddRoad"));
+	FactoryLog->ClearFailure(TEXT("AddRoad"));
 	FRoadCellData NewRoad; NewRoad.bHorizontal = bHorizontal;
 	TArray<int32> Connections;
 	TArray<FIntPoint> ChangedDirections;
@@ -137,8 +139,8 @@ bool ARoadNetworkActor::AddRoad(FIntPoint Cell, bool bHorizontal)
 }
 bool ARoadNetworkActor::RemoveRoad(FIntPoint Cell)
 {
-	if (!Roads.Remove(Cell)) return OperationLog.Fail(this, TEXT("RemoveRoad"), TEXT("Road does not exist."), Cell.ToString());
-	OperationLog.Succeed(TEXT("RemoveRoad"));
+	if (!Roads.Remove(Cell)) return FactoryLog->ReportFailure(TEXT("RemoveRoad"), TEXT("Road does not exist."), Cell.ToString());
+	FactoryLog->ClearFailure(TEXT("RemoveRoad"));
 	if (auto* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this)) Terrain->ReleaseRoadCell(Cell, this);
 	for (int32 D = 0; D < 4; ++D)
 	{
@@ -153,8 +155,8 @@ bool ARoadNetworkActor::GetRoad(FIntPoint Cell, FRoadCellData& OutData) const
 {
 	const auto* Data = Roads.Find(Cell);
 	OutData = Data ? *Data : FRoadCellData();
-	if (!Data) return OperationLog.Fail(this, TEXT("GetRoad"), TEXT("Road does not exist."), Cell.ToString());
-	OperationLog.Succeed(TEXT("GetRoad"));
+	if (!Data) return FactoryLog->ReportFailure(TEXT("GetRoad"), TEXT("Road does not exist."), Cell.ToString());
+	FactoryLog->ClearFailure(TEXT("GetRoad"));
 	return true;
 }
 bool ARoadNetworkActor::HasRoad(FIntPoint Cell) const { return Roads.Contains(Cell); }
@@ -214,10 +216,10 @@ void ARoadNetworkActor::RebuildVisuals()
 		const FName MeshOperation(*FString::Printf(TEXT("RoadMesh%d"), Type));
 		if (!Mesh)
 		{
-			OperationLog.Fail(this, MeshOperation, TEXT("Road mesh is not assigned."), FString::Printf(TEXT("MeshType=%d Cell=%s"), Type, *Pair.Key.ToString()));
+			FactoryLog->ReportFailure(MeshOperation, TEXT("Road mesh is not assigned."), FString::Printf(TEXT("MeshType=%d Cell=%s"), Type, *Pair.Key.ToString()));
 			continue;
 		}
-		OperationLog.Succeed(MeshOperation);
+		FactoryLog->ClearFailure(MeshOperation);
 		const FBox Box = Mesh->GetBoundingBox();
 		const FVector MeshOriginOffset(250.0f, 250.0f, Box.Min.Z);
 		const FQuat Rotation = FRotator(0, Yaw, 0).Quaternion();
@@ -225,11 +227,11 @@ void ARoadNetworkActor::RebuildVisuals()
 		const int32 Index = RoadInstances[Type]->AddInstance(FTransform(Rotation, Center - Rotation.RotateVector(MeshOriginOffset)), true);
 		if (Index == INDEX_NONE)
 		{
-			OperationLog.Fail(this, TEXT("AddRoadInstance"), TEXT("Failed to create road mesh instance."), Pair.Key.ToString());
+			FactoryLog->ReportFailure(TEXT("AddRoadInstance"), TEXT("Failed to create road mesh instance."), Pair.Key.ToString());
 		}
 		else
 		{
-			OperationLog.Succeed(TEXT("AddRoadInstance"));
+			FactoryLog->ClearFailure(TEXT("AddRoadInstance"));
 			FRoadVisualIndex Visual;
 			Visual.Type = Type;
 			Visual.InstanceIndex = Index;

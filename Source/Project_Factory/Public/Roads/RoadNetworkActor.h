@@ -1,11 +1,11 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "FactoryGameLog.h"
 #include "RoadNetworkActor.generated.h"
 
 class UInstancedStaticMeshComponent;
 class UStaticMesh;
+class UFactoryLogComponent;
 
 USTRUCT(BlueprintType)
 struct FRoadCellData
@@ -26,6 +26,8 @@ class PROJECT_FACTORY_API ARoadNetworkActor : public AActor
  GENERATED_BODY()
 public:
  ARoadNetworkActor();
+ /** 블루프린트에서 공통 로그와 반복 실패 기록을 사용한다. */
+ UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Factory|Road|Components") TObjectPtr<UFactoryLogComponent> FactoryLog;
  // 한 셀을 강조하고 이전 선택을 해제한다. 도로가 없는 셀이면 선택을 해제하고 false를 반환한다.
  UFUNCTION(BlueprintCallable, Category="Factory|Road|Highlight") bool SetHighlightedRoad(FIntPoint Cell);
  UFUNCTION(BlueprintCallable, Category="Factory|Road|Highlight") void ClearHighlightedRoad();
@@ -51,7 +53,6 @@ protected:
  virtual void Destroyed() override;
  virtual void OnConstruction(const FTransform& Transform) override;
 private:
-	FFactoryOperationLog OperationLog;
  struct FRoadVisualIndex
  {
   int32 Type = 0;

@@ -1,4 +1,5 @@
 #include "Buildings/FactoryBuildingBase.h"
+#include "Logging/FactoryLogComponent.h"
 #include "Inventory/FactoryInventoryComponent.h"
 #include "Production/FactoryProductionComponent.h"
 
@@ -20,7 +21,7 @@ bool AFactoryBuildingBase::GetRoadPort(bool bEntrance, FIntPoint AnchorGridCoord
 	const FName Operation = bEntrance ? TEXT("GetEntranceRoadPort") : TEXT("GetExitRoadPort");
 	if (!Port.bEnabled || Direction > 3 || Cell.X < 0 || Cell.Y < 0 || Cell.X >= Size.X || Cell.Y >= Size.Y)
 	{
-		return OperationLog.Fail(this, Operation, TEXT("Port is disabled or its local cell/direction is invalid."),
+		return FactoryLog->ReportFailure(Operation, TEXT("Port is disabled or its local cell/direction is invalid."),
 			FString::Printf(TEXT("Cell=%s Direction=%d Size=%s"), *Cell.ToString(), Direction, *Size.ToString()));
 	}
 	const FIntPoint Steps[] = { FIntPoint(0,1), FIntPoint(1,0), FIntPoint(0,-1), FIntPoint(-1,0) };
@@ -28,7 +29,7 @@ bool AFactoryBuildingBase::GetRoadPort(bool bEntrance, FIntPoint AnchorGridCoord
 	// 내부를 향하는 연결점은 허용하지 않는다.
 	if (Outside.X >= 0 && Outside.Y >= 0 && Outside.X < Size.X && Outside.Y < Size.Y)
 	{
-		return OperationLog.Fail(this, Operation, TEXT("Port must face outside the building footprint."), Cell.ToString());
+		return FactoryLog->ReportFailure(Operation, TEXT("Port must face outside the building footprint."), Cell.ToString());
 	}
 	const int32 Turns = (QuarterTurns % 4 + 4) % 4;
 	for (int32 I = 0; I < Turns; ++I)
@@ -42,9 +43,9 @@ bool AFactoryBuildingBase::GetRoadPort(bool bEntrance, FIntPoint AnchorGridCoord
 	const int64 Y = int64(AnchorGridCoordinate.Y) + Cell.Y + Steps[Direction].Y;
 	if (X < MIN_int32 || X > MAX_int32 || Y < MIN_int32 || Y > MAX_int32)
 	{
-		return OperationLog.Fail(this, Operation, TEXT("Road port coordinate exceeds int32 range."), AnchorGridCoordinate.ToString());
+		return FactoryLog->ReportFailure(Operation, TEXT("Road port coordinate exceeds int32 range."), AnchorGridCoordinate.ToString());
 	}
-	OperationLog.Succeed(Operation);
+	FactoryLog->ClearFailure(Operation);
 	OutRoadCell = FIntPoint(int32(X), int32(Y));
 	OutConnectionMask = 1 << ((Direction + 2) % 4);
 	return true;
@@ -72,6 +73,7 @@ void AFactoryBuildingBase::Destroyed()
 AFactoryBuildingBase::AFactoryBuildingBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	FactoryLog = CreateDefaultSubobject<UFactoryLogComponent>(TEXT("FactoryLog"));
 	Inventory = CreateDefaultSubobject<UFactoryInventoryComponent>(TEXT("Inventory"));
 	Production = CreateDefaultSubobject<UFactoryProductionComponent>(TEXT("Production"));
 
@@ -108,10 +110,10 @@ TArray<FIntPoint> AFactoryBuildingBase::GetFootprintCells(FIntPoint AnchorGridCo
 	if (static_cast<int64>(AnchorGridCoordinate.X) + Size.X - 1 > MAX_int32
 		|| static_cast<int64>(AnchorGridCoordinate.Y) + Size.Y - 1 > MAX_int32)
 	{
-		OperationLog.Fail(this, TEXT("GetFootprintCells"), TEXT("Footprint coordinates exceed int32 range."), AnchorGridCoordinate.ToString());
+		FactoryLog->ReportFailure(TEXT("GetFootprintCells"), TEXT("Footprint coordinates exceed int32 range."), AnchorGridCoordinate.ToString());
 		return Cells;
 	}
-	OperationLog.Succeed(TEXT("GetFootprintCells"));
+	FactoryLog->ClearFailure(TEXT("GetFootprintCells"));
 	Cells.Reserve(Size.X * Size.Y);
 	for (int32 Y = 0; Y < Size.Y; ++Y)
 	{
@@ -136,22 +138,22 @@ bool AFactoryBuildingBase::CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int
 		if (!Terrain->GetCellAtGridCoordinate(Coordinate, Cell)) return false;
 		if (!IsTerrainAllowed(Cell.TerrainType))
 		{
-			return OperationLog.Fail(this, TEXT("CanPlaceOnTerrain"), TEXT("Terrain type is not allowed."), Coordinate.ToString());
+			return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Terrain type is not allowed."), Coordinate.ToString());
 		}
 		if (Cell.ResourceType != ECellResourceType::None)
 		{
 			if (Cell.TerrainType != ETerrainType::Land || Cell.ResourceType != RequiredResourceType)
 			{
-				return OperationLog.Fail(this, TEXT("CanPlaceOnTerrain"), TEXT("Cell resource is incompatible with the building."), Coordinate.ToString());
+				return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Cell resource is incompatible with the building."), Coordinate.ToString());
 			}
 			bFoundRequiredResource = true;
 		}
 	}
 	if (!bFoundRequiredResource)
 	{
-		return OperationLog.Fail(this, TEXT("CanPlaceOnTerrain"), TEXT("Required resource is missing from the footprint."), AnchorGridCoordinate.ToString());
+		return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Required resource is missing from the footprint."), AnchorGridCoordinate.ToString());
 	}
-	OperationLog.Succeed(TEXT("CanPlaceOnTerrain"));
+	FactoryLog->ClearFailure(TEXT("CanPlaceOnTerrain"));
 	return true;
 }
 

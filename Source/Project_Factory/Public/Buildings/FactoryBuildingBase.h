@@ -3,13 +3,13 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Terrain/TerrainChunkData.h"
-#include "FactoryGameLog.h"
 #include "FactoryBuildingBase.generated.h"
 
 class USceneComponent;
 class UStaticMeshComponent;
 class UFactoryInventoryComponent;
 class UFactoryProductionComponent;
+class UFactoryLogComponent;
 
 UENUM(BlueprintType)
 enum class EBuildingPortDirection : uint8
@@ -38,6 +38,10 @@ class PROJECT_FACTORY_API AFactoryBuildingBase : public AActor
 
 public:
 	AFactoryBuildingBase();
+
+	/** 블루프린트에서 공통 로그와 반복 실패 기록을 사용한다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Factory|Building|Components")
+	TObjectPtr<UFactoryLogComponent> FactoryLog;
 
 	/** 건물마다 독립된 입력 재료와 출력 상품을 보관한다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Factory|Building|Components")
@@ -160,7 +164,6 @@ protected:
 
 
 private:
-	FFactoryOperationLog OperationLog;
 	UPROPERTY(Transient)
 	bool bPlacementPreview = false;
 
