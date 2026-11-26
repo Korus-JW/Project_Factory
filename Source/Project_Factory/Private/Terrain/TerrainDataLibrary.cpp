@@ -63,9 +63,14 @@ bool UTerrainDataLibrary::IsValidChunk(const FTerrainChunkData& Data)
 
 int32 UTerrainDataLibrary::GetCellIndex(const FTerrainChunkData& Data, int32 X, int32 Y)
 {
-	if (!IsValidChunk(Data) || X < 0 || Y < 0 || X >= Data.Width || Y >= Data.Height)
+	if (!IsValidChunk(Data))
 	{
-		OperationLog.Fail(GetDefault<UTerrainDataLibrary>(), TEXT("GetCellIndex"), TEXT("Invalid chunk data or cell coordinates."), FString::Printf(TEXT("Chunk=%s Cell=(%d,%d) Dimensions=(%d,%d) Cells=%d"), *Data.ChunkCoordinate.ToString(), X, Y, Data.Width, Data.Height, Data.Cells.Num()));
+		OperationLog.Fail(GetDefault<UTerrainDataLibrary>(), TEXT("GetCellIndex"), TEXT("Invalid chunk dimensions or cell array size."), Data.ChunkCoordinate.ToString());
+		return INDEX_NONE;
+	}
+	if (X < 0 || Y < 0 || X >= Data.Width || Y >= Data.Height)
+	{
+		OperationLog.Fail(GetDefault<UTerrainDataLibrary>(), TEXT("GetCellIndex"), TEXT("Invalid chunk data or cell coordinates."), FString::Printf(TEXT("Chunk=%s Cell=(%d,%d) Dimensions=(%d,%d) Cells=%d"), *Data.ChunkCoordinate.ToString(), X, Y, Data.Width, Data.Height, Data.Cells.Num()), EFactoryLogLevel::Verbose);
 		return INDEX_NONE;
 	}
 	OperationLog.Succeed(TEXT("GetCellIndex"));

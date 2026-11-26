@@ -37,7 +37,7 @@ public:
 
 	/** 생성된 땅이며 건물과 도로 모두 없는지 검사한다. */
 	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Road")
-	bool CanPlaceRoad(FIntPoint GridCoordinate) const;
+	bool CanPlaceRoad(FIntPoint GridCoordinate, EFactoryLogLevel FailureLevel = EFactoryLogLevel::Verbose) const;
 
 	/** 전체 격자 좌표의 점유 건물을 반환한다. 비어 있으면 nullptr이다. */
 	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Building")
@@ -45,11 +45,11 @@ public:
 
 	/** 빈 배열은 실패한다. 지형 조건은 검사하지 않고 점유 여부만 검사한다. */
 	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Building")
-	bool IsAreaFree(const TArray<FIntPoint>& GridCoordinates) const;
+	bool IsAreaFree(const TArray<FIntPoint>& GridCoordinates, EFactoryLogLevel FailureLevel = EFactoryLogLevel::Verbose) const;
 
 	/** 건물의 전체 영역에 대해 지형과 점유를 함께 검사한다. 미리보기에도 사용할 수 있다. */
 	UFUNCTION(BlueprintPure, Category = "Factory|Terrain|Building")
-	bool CanPlaceBuilding(AFactoryBuildingBase* Building, FIntPoint AnchorGridCoordinate, int32 QuarterTurns = 0) const;
+	bool CanPlaceBuilding(AFactoryBuildingBase* Building, FIntPoint AnchorGridCoordinate, int32 QuarterTurns = 0, EFactoryLogLevel FailureLevel = EFactoryLogLevel::Verbose) const;
 
 	/** 전체 검사 성공 시에만 등록한다. 미리보기와 이미 등록된 건물은 실패한다.
 	 * 액터 생성이나 이동은 수행하지 않는다. 실패 시 호출자가 새 액터를 정리해야 한다. */

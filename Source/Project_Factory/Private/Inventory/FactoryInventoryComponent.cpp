@@ -103,7 +103,7 @@ bool UFactoryInventoryComponent::HasItems(EFactoryInventorySlot Slot, const TArr
 	{
 		if (GetQuantity(Slot, Pair.Key) < Pair.Value)
 		{
-			return OperationLog.Fail(this, TEXT("HasItems"), TEXT("Insufficient inventory for item ") + Pair.Key.ToString(), FString::Printf(TEXT("Slot=%d Required=%d Available=%d"), int32(Slot), Pair.Value, GetQuantity(Slot, Pair.Key)));
+			return OperationLog.Fail(this, TEXT("HasItems"), TEXT("Insufficient inventory for item ") + Pair.Key.ToString(), FString::Printf(TEXT("Slot=%d Required=%d Available=%d"), int32(Slot), Pair.Value, GetQuantity(Slot, Pair.Key)), EFactoryLogLevel::Verbose);
 		}
 	}
 	OperationLog.Succeed(TEXT("HasItems"));
@@ -137,7 +137,7 @@ int32 UFactoryInventoryComponent::AddItems(EFactoryInventorySlot Slot, FName Ite
 	const int32 Added = FMath::Min(Quantity, GetFreeSpace(Slot, ItemId));
 	if (Added < Quantity)
 	{
-		OperationLog.Fail(this, TEXT("AddItems"), TEXT("Insufficient storage space."), FString::Printf(TEXT("Slot=%d Item=%s Requested=%d Actual=%d"), int32(Slot), *ItemId.ToString(), Quantity, Added));
+		OperationLog.Fail(this, TEXT("AddItems"), TEXT("Insufficient storage space."), FString::Printf(TEXT("Slot=%d Item=%s Requested=%d Actual=%d"), int32(Slot), *ItemId.ToString(), Quantity, Added), EFactoryLogLevel::Verbose);
 	}
 	else
 	{
@@ -161,7 +161,7 @@ int32 UFactoryInventoryComponent::RemoveItems(EFactoryInventorySlot Slot, FName 
 	const int32 Removed = FMath::Min(Quantity, GetQuantity(Slot, ItemId));
 	if (Removed < Quantity)
 	{
-		OperationLog.Fail(this, TEXT("RemoveItems"), TEXT("Insufficient stock."), FString::Printf(TEXT("Slot=%d Item=%s Requested=%d Actual=%d"), int32(Slot), *ItemId.ToString(), Quantity, Removed));
+		OperationLog.Fail(this, TEXT("RemoveItems"), TEXT("Insufficient stock."), FString::Printf(TEXT("Slot=%d Item=%s Requested=%d Actual=%d"), int32(Slot), *ItemId.ToString(), Quantity, Removed), EFactoryLogLevel::Verbose);
 	}
 	else
 	{
@@ -190,7 +190,7 @@ bool UFactoryInventoryComponent::TryConsumeItems(EFactoryInventorySlot Slot, con
 	{
 		if (GetQuantity(Slot, Pair.Key) < Pair.Value)
 		{
-			return OperationLog.Fail(this, TEXT("TryConsumeItems"), TEXT("Insufficient inventory for item ") + Pair.Key.ToString(), FString::Printf(TEXT("Slot=%d Required=%d Available=%d"), int32(Slot), Pair.Value, GetQuantity(Slot, Pair.Key)));
+			return OperationLog.Fail(this, TEXT("TryConsumeItems"), TEXT("Insufficient inventory for item ") + Pair.Key.ToString(), FString::Printf(TEXT("Slot=%d Required=%d Available=%d"), int32(Slot), Pair.Value, GetQuantity(Slot, Pair.Key)), EFactoryLogLevel::Verbose);
 		}
 	}
 	auto& Storage = GetMutableStorage(Slot);

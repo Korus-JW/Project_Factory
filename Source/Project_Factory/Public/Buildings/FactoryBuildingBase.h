@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "FactoryGameLog.h"
 #include "GameFramework/Actor.h"
 #include "Terrain/TerrainChunkData.h"
 #include "FactoryBuildingBase.generated.h"
@@ -77,7 +78,7 @@ public:
 	/** 모든 점유 예정 셀이 생성된 지역에 있고 허용된 지형인지 검사한다.
 	 * 자원 조건도 검사한다. 다른 건물의 점유와 비용은 별도 배치 시스템에서 검사한다. */
 	UFUNCTION(BlueprintPure, Category = "Factory|Building|Placement")
-	bool CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int32 QuarterTurns = 0) const;
+	bool CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int32 QuarterTurns = 0, EFactoryLogLevel FailureLevel = EFactoryLogLevel::Verbose) const;
 
 	/*건설 가능 여부를 업데이트 한다.*/
 	UFUNCTION(BlueprintCallable, Category = "Factory|Building|Preview")

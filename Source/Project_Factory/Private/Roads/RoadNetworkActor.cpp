@@ -60,7 +60,7 @@ bool ARoadNetworkActor::SetHighlightedRoad(FIntPoint Cell)
 	if (!Roads.Contains(Cell))
 	{
 		ClearHighlightedRoad();
-		return FactoryLog->ReportFailure(TEXT("SetHighlightedRoad"), TEXT("No road exists at the requested cell."), Cell.ToString());
+		return FactoryLog->ReportFailure(TEXT("SetHighlightedRoad"), TEXT("No road exists at the requested cell."), Cell.ToString(), EFactoryLogLevel::Verbose);
 	}
 	FactoryLog->ClearFailure(TEXT("SetHighlightedRoad"));
 	if (HighlightedCell.IsSet() && HighlightedCell.GetValue() == Cell) return true;
@@ -76,7 +76,7 @@ void ARoadNetworkActor::ClearHighlightedRoad()
 }
 bool ARoadNetworkActor::AddRoad(FIntPoint Cell, bool bHorizontal)
 {
-	if (Roads.Contains(Cell)) return FactoryLog->ReportFailure(TEXT("AddRoad"), TEXT("Road already exists."), Cell.ToString());
+	if (Roads.Contains(Cell)) return FactoryLog->ReportFailure(TEXT("AddRoad"), TEXT("Road already exists."), Cell.ToString(), EFactoryLogLevel::Log);
 	auto* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this);
 	if (!Terrain || !Terrain->TryOccupyRoadCell(Cell, this)) return false;
 	FactoryLog->ClearFailure(TEXT("AddRoad"));
@@ -139,7 +139,7 @@ bool ARoadNetworkActor::AddRoad(FIntPoint Cell, bool bHorizontal)
 }
 bool ARoadNetworkActor::RemoveRoad(FIntPoint Cell)
 {
-	if (!Roads.Remove(Cell)) return FactoryLog->ReportFailure(TEXT("RemoveRoad"), TEXT("Road does not exist."), Cell.ToString());
+	if (!Roads.Remove(Cell)) return FactoryLog->ReportFailure(TEXT("RemoveRoad"), TEXT("Road does not exist."), Cell.ToString(), EFactoryLogLevel::Log);
 	FactoryLog->ClearFailure(TEXT("RemoveRoad"));
 	if (auto* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this)) Terrain->ReleaseRoadCell(Cell, this);
 	for (int32 D = 0; D < 4; ++D)
@@ -155,7 +155,7 @@ bool ARoadNetworkActor::GetRoad(FIntPoint Cell, FRoadCellData& OutData) const
 {
 	const auto* Data = Roads.Find(Cell);
 	OutData = Data ? *Data : FRoadCellData();
-	if (!Data) return FactoryLog->ReportFailure(TEXT("GetRoad"), TEXT("Road does not exist."), Cell.ToString());
+	if (!Data) return FactoryLog->ReportFailure(TEXT("GetRoad"), TEXT("Road does not exist."), Cell.ToString(), EFactoryLogLevel::Verbose);
 	FactoryLog->ClearFailure(TEXT("GetRoad"));
 	return true;
 }

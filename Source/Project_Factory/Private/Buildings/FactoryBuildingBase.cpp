@@ -19,7 +19,11 @@ bool AFactoryBuildingBase::GetRoadPort(bool bEntrance, FIntPoint AnchorGridCoord
 	FIntPoint Cell = Port.LocalCell;
 	int32 Direction = static_cast<int32>(Port.OutwardDirection);
 	const FName Operation = bEntrance ? TEXT("GetEntranceRoadPort") : TEXT("GetExitRoadPort");
-	if (!Port.bEnabled || Direction > 3 || Cell.X < 0 || Cell.Y < 0 || Cell.X >= Size.X || Cell.Y >= Size.Y)
+	if (!Port.bEnabled)
+	{
+		return FactoryLog->ReportFailure(Operation, TEXT("Road port is disabled."), FString(), EFactoryLogLevel::Verbose);
+	}
+	if (Direction > 3 || Cell.X < 0 || Cell.Y < 0 || Cell.X >= Size.X || Cell.Y >= Size.Y)
 	{
 		return FactoryLog->ReportFailure(Operation, TEXT("Port is disabled or its local cell/direction is invalid."),
 			FString::Printf(TEXT("Cell=%s Direction=%d Size=%s"), *Cell.ToString(), Direction, *Size.ToString()));
@@ -125,7 +129,7 @@ TArray<FIntPoint> AFactoryBuildingBase::GetFootprintCells(FIntPoint AnchorGridCo
 	return Cells;
 }
 
-bool AFactoryBuildingBase::CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int32 QuarterTurns) const
+bool AFactoryBuildingBase::CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int32 QuarterTurns, EFactoryLogLevel FailureLevel) const
 {
 	const UTerrainWorldSubsystem* Terrain = UTerrainWorldSubsystem::GetTerrainWorldSubsystem(this);
 	if (!Terrain) return false;
@@ -135,23 +139,26 @@ bool AFactoryBuildingBase::CanPlaceOnTerrain(FIntPoint AnchorGridCoordinate, int
 	for (const FIntPoint& Coordinate : Cells)
 	{
 		FGridCellData Cell;
-		if (!Terrain->GetCellAtGridCoordinate(Coordinate, Cell)) return false;
+		if (!Terrain->GetCellAtGridCoordinate(Coordinate, Cell))
+		{
+			return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Footprint cell has not been generated."), Coordinate.ToString(), FailureLevel);
+		}
 		if (!IsTerrainAllowed(Cell.TerrainType))
 		{
-			return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Terrain type is not allowed."), Coordinate.ToString());
+			return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Terrain type is not allowed."), Coordinate.ToString(), FailureLevel);
 		}
 		if (Cell.ResourceType != ECellResourceType::None)
 		{
 			if (Cell.TerrainType != ETerrainType::Land || Cell.ResourceType != RequiredResourceType)
 			{
-				return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Cell resource is incompatible with the building."), Coordinate.ToString());
+				return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Cell resource is incompatible with the building."), Coordinate.ToString(), FailureLevel);
 			}
 			bFoundRequiredResource = true;
 		}
 	}
 	if (!bFoundRequiredResource)
 	{
-		return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Required resource is missing from the footprint."), AnchorGridCoordinate.ToString());
+		return FactoryLog->ReportFailure(TEXT("CanPlaceOnTerrain"), TEXT("Required resource is missing from the footprint."), AnchorGridCoordinate.ToString(), FailureLevel);
 	}
 	FactoryLog->ClearFailure(TEXT("CanPlaceOnTerrain"));
 	return true;
@@ -185,7 +192,7 @@ void AFactoryBuildingBase::SetPlacementPreview(bool bPreview)
 		SetActorEnableCollision(bCollisionEnabledBeforePreview);
 	}
 
-	UE_LOG(LogFactoryGame, Log, TEXT("Placement preview changed [Building=%s Preview=%d]"), *GetPathName(), bPreview);
+	UE_LOG(LogFactoryGame, Verbose, TEXT("Placement preview changed [Building=%s Preview=%d]"), *GetPathName(), bPreview);
 	bPlacementPreview = bPreview;
 	OnPlacementPreviewChanged(bPreview);
 }

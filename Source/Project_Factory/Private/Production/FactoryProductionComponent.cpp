@@ -69,16 +69,16 @@ void UFactoryProductionComponent::BeginPlay()
 
 bool UFactoryProductionComponent::SelectRecipe(FDataTableRowHandle Recipe)
 {
-	const auto Fail = [this, &Recipe](const FString& Reason)
+	const auto Fail = [this, &Recipe](const FString& Reason, EFactoryLogLevel Level = EFactoryLogLevel::Warning)
 	{
 		return OperationLog.Fail(this, TEXT("SelectRecipe"), Reason,
-			FString::Printf(TEXT("Table=%s Row=%s"), *GetPathNameSafe(Recipe.DataTable), *Recipe.RowName.ToString()));
+			FString::Printf(TEXT("Table=%s Row=%s"), *GetPathNameSafe(Recipe.DataTable), *Recipe.RowName.ToString()), Level);
 	};
 	if (bAdvancing) return Fail(TEXT("Production update is in progress."));
 	if (!AvailableRecipes.ContainsByPredicate([&](const FDataTableRowHandle& Entry)
 		{ return Entry.DataTable == Recipe.DataTable && Entry.RowName == Recipe.RowName; }))
 	{
-		return Fail(TEXT("Recipe is not in AvailableRecipes."));
+		return Fail(TEXT("Recipe is not in AvailableRecipes."), EFactoryLogLevel::Log);
 	}
 	if (!Recipe.DataTable || Recipe.RowName.IsNone()) return Fail(TEXT("Missing recipe table or row name."));
 	if (Recipe.DataTable->GetRowStruct() != FFactoryRecipeDefinition::StaticStruct()) return Fail(TEXT("Incompatible recipe row structure."));
@@ -97,6 +97,7 @@ bool UFactoryProductionComponent::SelectRecipe(FDataTableRowHandle Recipe)
 	// 현재 제작법을 다시 선택하면 이전 변경 예약을 취소한다.
 	if (SelectedRecipe.DataTable == Recipe.DataTable && SelectedRecipe.RowName == Recipe.RowName)
 	{
+		UE_LOG(LogFactoryGame, Log, TEXT("Current recipe selected; pending change cleared [Context=%s Row=%s]"), *GetPathName(), *Recipe.RowName.ToString());
 		bHasPendingRecipe = false;
 		PendingRecipe = FDataTableRowHandle();
 		return true;
@@ -124,15 +125,15 @@ void UFactoryProductionComponent::ApplyPendingRecipe()
 bool UFactoryProductionComponent::SetRecipe(const FFactoryRecipeDefinition& Recipe)
 {
 	// 첫 번째 실패 원인과 호출 대상 정보를 함께 남긴다.
-	const auto Fail = [this, &Recipe](const FString& Reason)
+	const auto Fail = [this, &Recipe](const FString& Reason, EFactoryLogLevel Level = EFactoryLogLevel::Warning)
 	{
 		return OperationLog.Fail(this, TEXT("SetRecipe"), Reason,
-			FString::Printf(TEXT("Recipe=%s"), *Recipe.DisplayName.ToString()));
+			FString::Printf(TEXT("Recipe=%s"), *Recipe.DisplayName.ToString()), Level);
 	};
-	if (!AvailableRecipes.IsEmpty()) return Fail(TEXT("AvailableRecipes is configured. Use SelectRecipe to choose a listed recipe."));
-	if (bWorking) return Fail(TEXT("Production or output delivery is in progress. Wait for completion or queue a change with SelectRecipe."));
+	if (!AvailableRecipes.IsEmpty()) return Fail(TEXT("AvailableRecipes is configured. Use SelectRecipe to choose a listed recipe."), EFactoryLogLevel::Log);
+	if (bWorking) return Fail(TEXT("Production or output delivery is in progress. Wait for completion or queue a change with SelectRecipe."), EFactoryLogLevel::Log);
 	if (bAdvancing) return Fail(TEXT("Cannot change a recipe during production update."));
-	if (!PendingOutputs.IsEmpty()) return Fail(TEXT("Undelivered outputs remain."));
+	if (!PendingOutputs.IsEmpty()) return Fail(TEXT("Undelivered outputs remain."), EFactoryLogLevel::Log);
 	if (!FMath::IsFinite(Recipe.ProductionTimeSeconds) || Recipe.ProductionTimeSeconds < 0.001f)
 		return Fail(FString::Printf(TEXT("ProductionTimeSeconds must be finite and at least 0.001. Value=%g"), Recipe.ProductionTimeSeconds));
 	if (Recipe.Outputs.IsEmpty()) return Fail(TEXT("Outputs is empty. At least one output is required."));
@@ -177,7 +178,7 @@ bool UFactoryProductionComponent::HasOutputSpace() const
 		if (FreeSpace < Item.Quantity)
 		{
 			return OperationLog.Fail(this, TEXT("HasOutputSpace"), TEXT("Insufficient output space for item ") + Item.ItemId.ToString(),
-				FString::Printf(TEXT("Required=%d Free=%d"), Item.Quantity, FreeSpace));
+				FString::Printf(TEXT("Required=%d Free=%d"), Item.Quantity, FreeSpace), EFactoryLogLevel::Verbose);
 		}
 	}
 	OperationLog.Succeed(TEXT("HasOutputSpace"));
@@ -259,6 +260,6 @@ void UFactoryProductionComponent::SetState(EFactoryProductionState NewState, con
 	}
 	else
 	{
-		UE_LOG(LogFactoryGame, Log, TEXT("Production state changed [Context=%s State=%d]: %s"), *GetPathName(), int32(NewState), *Reason);
+		UE_LOG(LogFactoryGame, Verbose, TEXT("Production state changed [Context=%s State=%d]: %s"), *GetPathName(), int32(NewState), *Reason);
 	}
 }

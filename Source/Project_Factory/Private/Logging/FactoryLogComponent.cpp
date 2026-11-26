@@ -6,10 +6,10 @@ UFactoryLogComponent::UFactoryLogComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-bool UFactoryLogComponent::ReportFailure(FName Operation, const FString& Reason, const FString& Details) const
+bool UFactoryLogComponent::ReportFailure(FName Operation, const FString& Reason, const FString& Details, EFactoryLogLevel Level) const
 {
 	const UObject* Context = GetOwner() ? static_cast<const UObject*>(GetOwner()) : this;
-	return OperationLog.Fail(Context, Operation, Reason, Details);
+	return OperationLog.Fail(Context, Operation, Reason, Details, Level);
 }
 
 void UFactoryLogComponent::ClearFailure(FName Operation) const
@@ -22,6 +22,9 @@ void UFactoryLogComponent::WriteLog(const FString& Message, EFactoryLogLevel Lev
 	const UObject* Context = GetOwner() ? static_cast<const UObject*>(GetOwner()) : this;
 	switch (Level)
 	{
+	case EFactoryLogLevel::Verbose:
+		UE_LOG(LogFactoryGame, Verbose, TEXT("[Context=%s] %s"), *GetPathNameSafe(Context), *Message);
+		break;
 	case EFactoryLogLevel::Log:
 		UE_LOG(LogFactoryGame, Log, TEXT("[Context=%s] %s"), *GetPathNameSafe(Context), *Message);
 		break;

@@ -51,4 +51,31 @@ bool FFactoryLogComponentTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFactoryLogLevelTest, "ProjectFactory.Logging.LevelsAndEscalation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FFactoryLogLevelTest::RunTest(const FString& Parameters)
+{
+	const ELogVerbosity::Type PreviousVerbosity = LogFactoryGame.GetVerbosity();
+	LogFactoryGame.SetVerbosity(ELogVerbosity::Verbose);
+	auto* Component = NewObject<UFactoryLogComponent>();
+	// 자동 검사 뒤 같은 원인의 경고가 억제되지 않고 한 번 출력되는지 검증한다.
+	AddExpectedMessagePlain(TEXT("Level transition reason"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 1);
+	Component->ReportFailure(TEXT("LevelTest"), TEXT("Level transition reason"), FString(), EFactoryLogLevel::Verbose);
+	Component->ReportFailure(TEXT("LevelTest"), TEXT("Level transition reason"), FString(), EFactoryLogLevel::Verbose);
+	Component->ReportFailure(TEXT("LevelTest"), TEXT("Level transition reason"), FString(), EFactoryLogLevel::Warning);
+	Component->ReportFailure(TEXT("LevelTest"), TEXT("Level transition reason"), FString(), EFactoryLogLevel::Warning);
+	// 일반 로그는 자동화 프레임워크가 집계하지 않으므로 실제 로그 파일에서 횟수를 검증한다.
+	Component->ReportFailure(TEXT("RequestTest"), TEXT("User request rejection"), FString(), EFactoryLogLevel::Log);
+	Component->ReportFailure(TEXT("RequestTest"), TEXT("User request rejection"), FString(), EFactoryLogLevel::Log);
+	// Verbose의 실제 출력은 에디터 통합 검증에서 로그 파일로 확인한다.
+	Component->WriteLog(TEXT("Verbose component message"), EFactoryLogLevel::Verbose);
+	LogFactoryGame.SetVerbosity(PreviousVerbosity);
+	// 기존 블루프린트에 저장된 열거형 값의 호환성을 확인한다.
+	TestEqual(TEXT("기존 Log 값"), uint8(EFactoryLogLevel::Log), uint8(0));
+	TestEqual(TEXT("기존 Warning 값"), uint8(EFactoryLogLevel::Warning), uint8(1));
+	TestEqual(TEXT("기존 Error 값"), uint8(EFactoryLogLevel::Error), uint8(2));
+	return true;
+}
+
 #endif
