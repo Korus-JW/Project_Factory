@@ -40,4 +40,8 @@ struct PROJECT_FACTORY_API FFactoryItemDefinition : public FTableRowBase
 	/** 물품 한 단위가 차지하는 운송 적재량이다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Factory|Item", meta = (ClampMin = "1", UIMin = "1"))
 	int32 UnitCargoSize = 1;
+
+	/** 물품의 최대 스택이다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Factory|Item", meta = (ClampMin = "1", UIMin = "1"))
+	int32 Capacity = 100;
 };

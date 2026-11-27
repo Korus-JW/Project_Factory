@@ -122,7 +122,7 @@ bool UFactoryInventoryComponent::SetCapacity(EFactoryInventorySlot Slot, FName I
 	{
 		Capacities.Add(ItemId, Capacity);
 		UE_LOG(LogFactoryGame, Log, TEXT("Inventory capacity changed [Context=%s Slot=%d Item=%s Capacity=%d]"), *GetPathName(), int32(Slot), *ItemId.ToString(), Capacity);
-		OnInventoryChanged.Broadcast();
+		OnInventoryChanged.Broadcast(TArray<FFactoryInventoryChange>{ { Slot, ItemId } });
 	}
 	return true;
 }
@@ -146,7 +146,7 @@ int32 UFactoryInventoryComponent::AddItems(EFactoryInventorySlot Slot, FName Ite
 	if (Added > 0)
 	{
 		GetMutableStorage(Slot).FindOrAdd(ItemId) += Added;
-		OnInventoryChanged.Broadcast();
+		OnInventoryChanged.Broadcast(TArray<FFactoryInventoryChange>{ { Slot, ItemId } });
 	}
 	return Added;
 }
@@ -173,7 +173,7 @@ int32 UFactoryInventoryComponent::RemoveItems(EFactoryInventorySlot Slot, FName 
 		int32& Remaining = Storage.FindChecked(ItemId);
 		Remaining -= Removed;
 		if (Remaining == 0) Storage.Remove(ItemId);
-		OnInventoryChanged.Broadcast();
+		OnInventoryChanged.Broadcast(TArray<FFactoryInventoryChange>{ { Slot, ItemId } });
 	}
 	return Removed;
 }
@@ -201,7 +201,20 @@ bool UFactoryInventoryComponent::TryConsumeItems(EFactoryInventorySlot Slot, con
 		if (Remaining == 0) Storage.Remove(Pair.Key);
 	}
 	// 모든 재료의 차감이 끝난 뒤 한 번만 통지한다.
-	if (!Totals.IsEmpty()) OnInventoryChanged.Broadcast();
+	if (!Totals.IsEmpty())
+	{
+		TArray<FFactoryInventoryChange> ChangedItems;
+		ChangedItems.Reserve(Totals.Num());
+		for (const auto& Pair : Totals)
+		{
+			ChangedItems.Add({ Slot, Pair.Key });
+		}
+		ChangedItems.Sort([](const FFactoryInventoryChange& A, const FFactoryInventoryChange& B)
+		{
+			return A.ItemId.LexicalLess(B.ItemId);
+		});
+		OnInventoryChanged.Broadcast(ChangedItems);
+	}
 	OperationLog.Succeed(TEXT("TryConsumeItems"));
 	return true;
 }

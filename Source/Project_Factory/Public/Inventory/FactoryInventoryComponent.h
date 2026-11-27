@@ -14,7 +14,20 @@ enum class EFactoryInventorySlot : uint8
 	Output
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnFactoryInventoryChanged);
+/** 수량 또는 한도가 변경된 저장소와 품목을 식별한다. */
+USTRUCT(BlueprintType)
+struct PROJECT_FACTORY_API FFactoryInventoryChange
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Factory|Inventory")
+	EFactoryInventorySlot Slot = EFactoryInventorySlot::Input;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Factory|Inventory")
+	FName ItemId = NAME_None;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFactoryInventoryChanged, const TArray<FFactoryInventoryChange>&, ChangedItems);
 
 /** 품목별 한도와 재고를 관리한다. 미설정 품목의 저장 한도는 0이다. */
 UCLASS(ClassGroup = (Factory), meta = (BlueprintSpawnableComponent))
@@ -25,7 +38,7 @@ class PROJECT_FACTORY_API UFactoryInventoryComponent : public UActorComponent
 public:
 	UFactoryInventoryComponent();
 
-	/** 수량 또는 저장 한도가 변경되면 호출한다. 변경 후 조회 함수로 상태를 읽는다. */
+	/** 변경 완료 후 품목 목록을 전달한다. 해당 저장소와 품목의 최신 수량·한도는 조회 함수로 읽는다. */
 	UPROPERTY(BlueprintAssignable, Category = "Factory|Inventory")
 	FOnFactoryInventoryChanged OnInventoryChanged;
 
